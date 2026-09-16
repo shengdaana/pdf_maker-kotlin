@@ -1,0 +1,6 @@
+{
+  "name": "pdf_maker",
+  "description": "Ultra-simple photo to PDF maker with large accessible controls for elders, quality selector, and hidden developer settings.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
