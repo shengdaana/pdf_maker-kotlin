@@ -7,7 +7,6 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
@@ -16,7 +15,7 @@ import androidx.core.content.FileProvider
 import com.example.model.DeveloperSettings
 import com.example.model.GeneratedPdf
 import com.example.model.ImagePage
-import com.example.model.PageMarginOption
+import com.example.model.PageLayoutMode
 import com.example.model.PdfQuality
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -49,28 +48,24 @@ object PdfGenerator {
       val isStandard = selectedQuality == PdfQuality.STANDARD ||
         (selectedQuality == PdfQuality.ALWAYS_ASK && settings.defaultQuality == PdfQuality.STANDARD)
 
-      val targetWidth = if (isStandard) 1240 else 2480
-      val targetHeight = if (isStandard) 1754 else 3508
-      val jpegQuality = if (isStandard) 75 else 92
+      // Compression upgrade pipeline:
+      // Standard Quality: downsample long edge to ~1920-2040px with ~70% JPEG quality
+      // Original Quality: high decode buffer ~3500px with ~94% quality
+      val targetDimension = if (isStandard) 1920 else 3500
+      val jpegQuality = if (isStandard) 70 else 94
 
-      val marginPoints = if (settings.pageMargin == PageMarginOption.BORDERED) 28f else 0f
+      val isFreeDynamic = settings.pageLayoutMode == PageLayoutMode.FREE_DYNAMIC
       val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
       for (i in pages.indices) {
         onProgress(i + 1, pages.size)
-        val pageInfo = PdfDocument.PageInfo.Builder(A4_WIDTH_PTS, A4_HEIGHT_PTS, i + 1).create()
-        val pdfPage = pdfDocument.startPage(pageInfo)
-        val canvas: Canvas = pdfPage.canvas
-
-        // Paint white background
-        canvas.drawColor(Color.WHITE)
-
         val pageItem = pages[i]
+
         val rawBitmap = ImageUtils.decodeSampledBitmapFromUri(
           context,
           pageItem.uri,
-          targetWidth,
-          targetHeight
+          targetDimension,
+          targetDimension
         )
 
         if (rawBitmap != null) {
@@ -78,47 +73,91 @@ object PdfGenerator {
           val processed = ImageUtils.processBitmap(
             rawBitmap,
             pageItem.rotationDegrees,
+            pageItem.cropRect,
             pageItem.cropAspectRatio,
             autoTrim
           )
 
-          // Compress to JPEG stream if standard quality to save PDF weight
-          val finalBitmap = if (isStandard) {
-            val stream = ByteArrayOutputStream()
-            processed.compress(Bitmap.CompressFormat.JPEG, jpegQuality, stream)
-            val bytes = stream.toByteArray()
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: processed
+          // Downsample and compress to JPEG if standard quality to reduce PDF weight significantly
+          val downsampled = if (isStandard) {
+            ImageUtils.downsampleBitmap(processed, targetDimension)
           } else {
             processed
           }
 
-          // Compute destination rect on A4 page
-          val availableWidth = A4_WIDTH_PTS - (marginPoints * 2)
-          val availableHeight = A4_HEIGHT_PTS - (marginPoints * 2)
+          val finalBitmap = if (isStandard) {
+            val stream = ByteArrayOutputStream()
+            downsampled.compress(Bitmap.CompressFormat.JPEG, jpegQuality, stream)
+            val bytes = stream.toByteArray()
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: downsampled
+          } else {
+            downsampled
+          }
 
           val bmpWidth = finalBitmap.width.toFloat()
           val bmpHeight = finalBitmap.height.toFloat()
 
-          val scale = minOf(availableWidth / bmpWidth, availableHeight / bmpHeight)
-          val destWidth = bmpWidth * scale
-          val destHeight = bmpHeight * scale
+          if (isFreeDynamic) {
+            // MODE 1: FREE / DYNAMIC
+            // Page canvas matches the photo's native aspect ratio with zero margins
+            val basePt = 595f
+            val (pageW, pageH) = if (bmpWidth >= bmpHeight) {
+              val w = (basePt * (bmpWidth / bmpHeight)).toInt().coerceAtLeast(100)
+              w to basePt.toInt()
+            } else {
+              val h = (basePt * (bmpHeight / bmpWidth)).toInt().coerceAtLeast(100)
+              basePt.toInt() to h
+            }
 
-          val destLeft = marginPoints + (availableWidth - destWidth) / 2f
-          val destTop = marginPoints + (availableHeight - destHeight) / 2f
-          val destRect = RectF(destLeft, destTop, destLeft + destWidth, destTop + destHeight)
+            val pageInfo = PdfDocument.PageInfo.Builder(pageW, pageH, i + 1).create()
+            val pdfPage = pdfDocument.startPage(pageInfo)
+            val canvas: Canvas = pdfPage.canvas
 
-          canvas.drawBitmap(finalBitmap, null, destRect, paint)
+            // Direct edge-to-edge drawing with no white margins
+            val destRect = RectF(0f, 0f, pageW.toFloat(), pageH.toFloat())
+            canvas.drawBitmap(finalBitmap, null, destRect, paint)
+            pdfDocument.finishPage(pdfPage)
+          } else {
+            // MODE 2: A4 STANDARD
+            // Standard A4 page canvas with centered and scaled photo
+            val pageInfo = PdfDocument.PageInfo.Builder(A4_WIDTH_PTS, A4_HEIGHT_PTS, i + 1).create()
+            val pdfPage = pdfDocument.startPage(pageInfo)
+            val canvas: Canvas = pdfPage.canvas
+            canvas.drawColor(Color.WHITE)
 
-          if (finalBitmap != processed && finalBitmap != rawBitmap) {
+            val marginPoints = 20f
+            val availableWidth = A4_WIDTH_PTS - (marginPoints * 2)
+            val availableHeight = A4_HEIGHT_PTS - (marginPoints * 2)
+
+            val scale = minOf(availableWidth / bmpWidth, availableHeight / bmpHeight)
+            val destWidth = bmpWidth * scale
+            val destHeight = bmpHeight * scale
+
+            val destLeft = marginPoints + (availableWidth - destWidth) / 2f
+            val destTop = marginPoints + (availableHeight - destHeight) / 2f
+            val destRect = RectF(destLeft, destTop, destLeft + destWidth, destTop + destHeight)
+
+            canvas.drawBitmap(finalBitmap, null, destRect, paint)
+            pdfDocument.finishPage(pdfPage)
+          }
+
+          if (finalBitmap != downsampled && finalBitmap != processed && finalBitmap != rawBitmap) {
             finalBitmap.recycle()
+          }
+          if (downsampled != processed && downsampled != rawBitmap) {
+            downsampled.recycle()
           }
           if (processed != rawBitmap) {
             processed.recycle()
           }
           rawBitmap.recycle()
+        } else {
+          // Empty fallback page if decode fails
+          val pageInfo = PdfDocument.PageInfo.Builder(A4_WIDTH_PTS, A4_HEIGHT_PTS, i + 1).create()
+          val pdfPage = pdfDocument.startPage(pageInfo)
+          pdfPage.canvas.drawColor(Color.WHITE)
+          pdfDocument.finishPage(pdfPage)
         }
-
-        pdfDocument.finishPage(pdfPage)
       }
 
       // Prepare destination folder
@@ -187,7 +226,7 @@ object PdfGenerator {
             uri = uri,
             fileName = file.name,
             sizeBytes = file.length(),
-            pageCount = 1, // fast placeholder for list
+            pageCount = 1,
             timestamp = file.lastModified()
           )
         } catch (_: Exception) {
@@ -204,54 +243,56 @@ object PdfGenerator {
     }
   }
 
-  fun sharePdf(context: Context, pdf: GeneratedPdf) {
-    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-      type = "application/pdf"
-      putExtra(Intent.EXTRA_STREAM, pdf.uri)
-      putExtra(Intent.EXTRA_SUBJECT, pdf.fileName)
-      addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+  fun renamePdf(context: Context, pdf: GeneratedPdf, newFileName: String): GeneratedPdf? {
+    return try {
+      val cleanName = if (newFileName.endsWith(".pdf", ignoreCase = true)) {
+        newFileName
+      } else {
+        "$newFileName.pdf"
+      }
+      val newFile = File(pdf.file.parentFile, cleanName)
+      if (pdf.file.renameTo(newFile)) {
+        val newUri = FileProvider.getUriForFile(
+          context,
+          "${context.packageName}.fileprovider",
+          newFile
+        )
+        pdf.copy(
+          file = newFile,
+          uri = newUri,
+          fileName = cleanName,
+          sizeBytes = newFile.length()
+        )
+      } else {
+        null
+      }
+    } catch (_: Exception) {
+      null
     }
-    context.startActivity(Intent.createChooser(shareIntent, "Share PDF via"))
+  }
+
+  fun sharePdf(context: Context, pdf: GeneratedPdf) {
+    try {
+      val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "application/pdf"
+        putExtra(Intent.EXTRA_STREAM, pdf.uri)
+        putExtra(Intent.EXTRA_SUBJECT, pdf.fileName)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+      }
+      context.startActivity(Intent.createChooser(intent, "Share PDF via..."))
+    } catch (_: Exception) {
+    }
   }
 
   fun openPdf(context: Context, pdf: GeneratedPdf) {
-    val viewIntent = Intent(Intent.ACTION_VIEW).apply {
-      setDataAndType(pdf.uri, "application/pdf")
-      addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-      addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
     try {
-      context.startActivity(viewIntent)
+      val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(pdf.uri, "application/pdf")
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      }
+      context.startActivity(intent)
     } catch (_: Exception) {
-      // Fallback: share if no viewer is installed
-      sharePdf(context, pdf)
-    }
-  }
-
-  fun renamePdf(context: Context, oldPdf: GeneratedPdf, newFileNameWithExt: String): GeneratedPdf? {
-    val sanitized = if (newFileNameWithExt.endsWith(".pdf", ignoreCase = true)) {
-      newFileNameWithExt
-    } else {
-      "$newFileNameWithExt.pdf"
-    }
-
-    val newFile = File(oldPdf.file.parentFile, sanitized)
-    return if (oldPdf.file.renameTo(newFile)) {
-      val uri = FileProvider.getUriForFile(
-        context,
-        "${context.packageName}.fileprovider",
-        newFile
-      )
-      GeneratedPdf(
-        file = newFile,
-        uri = uri,
-        fileName = sanitized,
-        sizeBytes = newFile.length(),
-        pageCount = oldPdf.pageCount,
-        timestamp = System.currentTimeMillis()
-      )
-    } else {
-      null
     }
   }
 }

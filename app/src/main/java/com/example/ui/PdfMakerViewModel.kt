@@ -6,10 +6,12 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.model.AppScreen
+import com.example.model.CropRect
 import com.example.model.DeveloperSettings
 import com.example.model.GeneratedPdf
 import com.example.model.ImagePage
 import com.example.model.PdfQuality
+import com.example.util.ImageUtils
 import com.example.util.PdfGenerator
 import com.example.util.SettingsManager
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -119,6 +121,7 @@ class PdfMakerViewModel(application: Application) : AndroidViewModel(application
   fun updatePageCrop(
     pageId: String,
     rotationDegrees: Int,
+    cropRect: CropRect?,
     cropAspectRatio: Float?,
     autoTrim: Boolean
   ) {
@@ -126,6 +129,7 @@ class PdfMakerViewModel(application: Application) : AndroidViewModel(application
       if (page.id == pageId) {
         page.copy(
           rotationDegrees = rotationDegrees,
+          cropRect = cropRect,
           cropAspectRatio = cropAspectRatio,
           autoTrimApplied = autoTrim,
           customBitmapCacheKey = System.currentTimeMillis()
@@ -134,6 +138,36 @@ class PdfMakerViewModel(application: Application) : AndroidViewModel(application
         page
       }
     }
+    _pages.value = list
+  }
+
+  fun mergePages(firstIndex: Int) {
+    if (firstIndex < 0 || firstIndex >= _pages.value.size - 1) return
+    viewModelScope.launch {
+      val page1 = _pages.value[firstIndex]
+      val page2 = _pages.value[firstIndex + 1]
+      val mergedFile = ImageUtils.mergeTwoImages(getApplication(), page1, page2)
+      if (mergedFile != null) {
+        val mergedPage = ImagePage(
+          uri = Uri.fromFile(mergedFile),
+          isMerged = true,
+          originalPages = listOf(page1, page2)
+        )
+        val list = _pages.value.toMutableList()
+        list.removeAt(firstIndex + 1)
+        list[firstIndex] = mergedPage
+        _pages.value = list
+      }
+    }
+  }
+
+  fun unmergePage(index: Int) {
+    if (index < 0 || index >= _pages.value.size) return
+    val page = _pages.value[index]
+    val originals = page.originalPages ?: return
+    val list = _pages.value.toMutableList()
+    list.removeAt(index)
+    list.addAll(index, originals)
     _pages.value = list
   }
 

@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,29 +15,31 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AccessibilityNew
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Compress
 import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.FormatSize
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.MergeType
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -57,22 +60,31 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.model.AppLanguage
+import com.example.model.AppTheme
 import com.example.model.DeveloperSettings
-import com.example.model.PageMarginOption
+import com.example.model.PageLayoutMode
 import com.example.model.PdfQuality
+import com.example.ui.theme.CobaltPrimary
+import com.example.ui.theme.ElderYellowAccent
+import com.example.ui.theme.GreenPrimary
+import com.example.ui.theme.PinkPrimary
+import com.example.ui.theme.PurplePrimary
+import com.example.util.AppStrings
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HiddenSettingsScreen(
   currentSettings: DeveloperSettings,
   onUpdateSettings: (DeveloperSettings) -> Unit,
-  onBackPressed: () -> Unit
+  onBack: () -> Unit
 ) {
   var showEditFolderDialog by remember { mutableStateOf(false) }
   var tempFolderName by remember { mutableStateOf(currentSettings.defaultSavePath) }
@@ -81,22 +93,21 @@ fun HiddenSettingsScreen(
     topBar = {
       TopAppBar(
         title = {
-          Column {
-            Text(
-              text = "Developer & Admin Settings",
-              fontWeight = FontWeight.Bold,
-              fontSize = 18.sp
-            )
-            Text(
-              text = "Pre-configure app for relatives & elders",
-              style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-          }
+          Text(
+            text = AppStrings.get(currentSettings.language, "settings_title"),
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleLarge
+          )
         },
         navigationIcon = {
-          IconButton(onClick = onBackPressed) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+          IconButton(
+            onClick = onBack,
+            modifier = Modifier.testTag("settings_back_button")
+          ) {
+            Icon(
+              imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+              contentDescription = "Back"
+            )
           }
         },
         colors = TopAppBarDefaults.topAppBarColors(
@@ -110,13 +121,13 @@ fun HiddenSettingsScreen(
       modifier = Modifier
         .fillMaxSize()
         .padding(innerPadding)
-        .verticalScroll(rememberScrollState())
-        .padding(horizontal = 20.dp, vertical = 12.dp),
+        .padding(horizontal = 18.dp)
+        .verticalScroll(rememberScrollState()),
       verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
       // Explanatory Banner
       Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
         modifier = Modifier.fillMaxWidth()
       ) {
@@ -132,92 +143,93 @@ fun HiddenSettingsScreen(
           )
           Spacer(modifier = Modifier.width(12.dp))
           Text(
-            text = "These settings allow tech-savvy family members to customize the experience per relative's comfort level.",
+            text = AppStrings.get(currentSettings.language, "settings_subtitle"),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onPrimaryContainer
           )
         }
       }
 
-      // Feature 1: Default PDF Compression Toggle
+      // 1. THEMES PICKER (DROPDOWN)
       SettingsCard(
-        title = "1. Default PDF Compression",
-        icon = Icons.Default.Compress,
-        subtitle = "Set default quality or prompt on each generation"
+        title = "1. " + AppStrings.get(currentSettings.language, "theme_title"),
+        icon = Icons.Default.ColorLens,
+        subtitle = "Choose from 5 modern color styles"
       ) {
-        PdfQuality.entries.forEach { quality ->
-          Row(
-            modifier = Modifier
-              .fillMaxWidth()
-              .clickable {
-                onUpdateSettings(currentSettings.copy(defaultQuality = quality))
-              }
-              .padding(vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-          ) {
-            RadioButton(
-              selected = currentSettings.defaultQuality == quality,
-              onClick = { onUpdateSettings(currentSettings.copy(defaultQuality = quality)) }
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Column {
-              Text(
-                text = quality.displayName,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold
-              )
-              Text(
-                text = quality.description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-              )
+        SettingsDropdownSelector(
+          label = AppStrings.get(currentSettings.language, "theme_title"),
+          options = AppTheme.entries,
+          selectedOption = currentSettings.theme,
+          optionTitle = { it.displayName },
+          leadingContent = { theme ->
+            val colorPreview = when (theme) {
+              AppTheme.PURPLE -> PurplePrimary
+              AppTheme.LIGHT_GREEN -> GreenPrimary
+              AppTheme.PINK -> PinkPrimary
+              AppTheme.COBALT_BLUE -> CobaltPrimary
+              AppTheme.HIGH_CONTRAST_DARK -> ElderYellowAccent
             }
+            Box(
+              modifier = Modifier
+                .size(20.dp)
+                .clip(CircleShape)
+                .background(colorPreview)
+            )
+          },
+          onOptionSelected = { theme ->
+            onUpdateSettings(currentSettings.copy(theme = theme))
           }
-        }
+        )
       }
 
-      // Feature 2: Page Margin Control (Photo Ratio)
+      // 2. LANGUAGE PICKER (DROPDOWN)
       SettingsCard(
-        title = "2. Page Margin Control",
+        title = "2. " + AppStrings.get(currentSettings.language, "language_title"),
+        icon = Icons.Default.Language,
+        subtitle = "English, Everyday Hindi, and Hinglish"
+      ) {
+        SettingsDropdownSelector(
+          label = AppStrings.get(currentSettings.language, "language_title"),
+          options = AppLanguage.entries,
+          selectedOption = currentSettings.language,
+          optionTitle = { it.displayName },
+          leadingContent = {
+            Icon(
+              imageVector = Icons.Default.Language,
+              contentDescription = null,
+              modifier = Modifier.size(20.dp),
+              tint = MaterialTheme.colorScheme.primary
+            )
+          },
+          onOptionSelected = { lang ->
+            onUpdateSettings(currentSettings.copy(language = lang))
+          }
+        )
+      }
+
+      // 3. PDF PAGE SIZING & CANVAS LAYOUT (DROPDOWN)
+      SettingsCard(
+        title = "3. " + AppStrings.get(currentSettings.language, "page_layout_title"),
         icon = Icons.Default.Crop,
-        subtitle = "Prevent document text and edges from getting clipped"
+        subtitle = "Choose how photos map to PDF pages"
       ) {
-        PageMarginOption.entries.forEach { option ->
-          Row(
-            modifier = Modifier
-              .fillMaxWidth()
-              .clickable {
-                onUpdateSettings(currentSettings.copy(pageMargin = option))
-              }
-              .padding(vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-          ) {
-            RadioButton(
-              selected = currentSettings.pageMargin == option,
-              onClick = { onUpdateSettings(currentSettings.copy(pageMargin = option)) }
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Column {
-              Text(
-                text = option.displayName,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold
-              )
-              Text(
-                text = option.description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-              )
-            }
+        SettingsDropdownSelector(
+          label = AppStrings.get(currentSettings.language, "page_layout_title"),
+          options = PageLayoutMode.entries,
+          selectedOption = currentSettings.pageLayoutMode,
+          optionTitle = { it.displayName },
+          optionSubtitle = { it.description },
+          onOptionSelected = { mode ->
+            onUpdateSettings(currentSettings.copy(pageLayoutMode = mode, pageMargin = mode))
           }
-        }
+        )
       }
 
-      // Feature 3: Auto-Crop on Import
+      // 4. AUTO-CROP ON IMPORT (WITH SAFETY BUFFER MARGIN)
       SettingsCard(
-        title = "3. Auto-Crop on Import",
+        title = "4. " + AppStrings.get(currentSettings.language, "auto_crop_title"),
         icon = Icons.Default.AutoFixHigh,
-        subtitle = "Automatically trim dark borders or tables when photos are loaded"
+        subtitle = AppStrings.get(currentSettings.language, "auto_crop_desc")
       ) {
         Row(
           modifier = Modifier.fillMaxWidth(),
@@ -226,12 +238,12 @@ fun HiddenSettingsScreen(
         ) {
           Column(modifier = Modifier.weight(1f)) {
             Text(
-              text = "Auto-detect & trim dark borders",
+              text = "Trim Scanner/Table Shadows",
               style = MaterialTheme.typography.bodyMedium,
               fontWeight = FontWeight.SemiBold
             )
             Text(
-              text = "Applies smart border detection on imported photos",
+              text = "Retains safety buffer margin so document text is never cut off",
               style = MaterialTheme.typography.bodySmall,
               color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -245,41 +257,97 @@ fun HiddenSettingsScreen(
         }
       }
 
-      // Feature 4: Simplified Mode (Hide Reorder Arrows)
+      // 5. DEFAULT PDF QUALITY PRESET (DROPDOWN)
       SettingsCard(
-        title = "4. Simplified Mode for Elders",
-        icon = Icons.Default.SwapVert,
-        subtitle = "Hide up/down reorder arrows to prevent elder confusion"
+        title = "5. " + AppStrings.get(currentSettings.language, "compression_title"),
+        icon = Icons.Default.Compress,
+        subtitle = "Standard Quality downsamples to ~1920px for light PDF weight"
       ) {
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.SpaceBetween,
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          Column(modifier = Modifier.weight(1f)) {
-            Text(
-              text = "Hide Reorder Arrows",
-              style = MaterialTheme.typography.bodyMedium,
-              fontWeight = FontWeight.SemiBold
+        SettingsDropdownSelector(
+          label = AppStrings.get(currentSettings.language, "compression_title"),
+          options = PdfQuality.entries,
+          selectedOption = currentSettings.defaultQuality,
+          optionTitle = { it.displayName },
+          optionSubtitle = { it.description },
+          leadingContent = {
+            Icon(
+              imageVector = Icons.Default.Compress,
+              contentDescription = null,
+              modifier = Modifier.size(20.dp),
+              tint = MaterialTheme.colorScheme.primary
             )
-            Text(
-              text = "Keeps only essential buttons on page cards",
-              style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant
+          },
+          onOptionSelected = { quality ->
+            onUpdateSettings(currentSettings.copy(defaultQuality = quality))
+          }
+        )
+      }
+
+      // 6. SIMPLIFIED MODE & PAGE CONTROLS (WITH MERGE PAGES TOGGLE)
+      SettingsCard(
+        title = "6. Simplified Mode & Controls",
+        icon = Icons.Default.SwapVert,
+        subtitle = "Configure page controls and preview layout"
+      ) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            Column(modifier = Modifier.weight(1f)) {
+              Text(
+                text = "Hide Reorder Arrows",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold
+              )
+              Text(
+                text = "Fewer buttons on cards for a cleaner experience",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+              )
+            }
+            Switch(
+              checked = currentSettings.simplifiedMode,
+              onCheckedChange = { checked ->
+                onUpdateSettings(currentSettings.copy(simplifiedMode = checked))
+              }
             )
           }
-          Switch(
-            checked = currentSettings.simplifiedMode,
-            onCheckedChange = { checked ->
-              onUpdateSettings(currentSettings.copy(simplifiedMode = checked))
+
+          HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+          // Toggle for Merge Pages Between Pages (Default: OFF)
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            Column(modifier = Modifier.weight(1f)) {
+              Text(
+                text = AppStrings.get(currentSettings.language, "merge_pages_toggle_title"),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold
+              )
+              Text(
+                text = AppStrings.get(currentSettings.language, "merge_pages_toggle_desc"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+              )
             }
-          )
+            Switch(
+              checked = currentSettings.enableMergePages,
+              onCheckedChange = { checked ->
+                onUpdateSettings(currentSettings.copy(enableMergePages = checked))
+              }
+            )
+          }
         }
       }
 
-      // Feature 5: Default Save Location Path
+      // 7. DEFAULT SAVE LOCATION PATH
       SettingsCard(
-        title = "5. Default Save Location Path",
+        title = "7. " + AppStrings.get(currentSettings.language, "save_folder_title"),
         icon = Icons.Default.Folder,
         subtitle = "Target output folder in device Documents"
       ) {
@@ -295,11 +363,6 @@ fun HiddenSettingsScreen(
               fontWeight = FontWeight.Bold,
               color = MaterialTheme.colorScheme.primary
             )
-            Text(
-              text = "Tap change to customize the folder name",
-              style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
           }
           TextButton(
             onClick = {
@@ -312,49 +375,16 @@ fun HiddenSettingsScreen(
         }
       }
 
-      // Feature 6: Dark Mode / Contrast Booster
+      // Privacy & Security Statement Card
       SettingsCard(
-        title = "6. Contrast Booster for Elders",
-        icon = Icons.Default.AccessibilityNew,
-        subtitle = "Increase button contrast and text size for elders with lower vision"
-      ) {
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.SpaceBetween,
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          Column(modifier = Modifier.weight(1f)) {
-            Text(
-              text = "High Contrast Mode",
-              style = MaterialTheme.typography.bodyMedium,
-              fontWeight = FontWeight.SemiBold
-            )
-            Text(
-              text = "Deep black borders, larger text, high visibility buttons",
-              style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-          }
-          Switch(
-            checked = currentSettings.highContrastMode,
-            onCheckedChange = { checked ->
-              onUpdateSettings(currentSettings.copy(highContrastMode = checked))
-            }
-          )
-        }
-      }
-
-      // About & Privacy Statement Card
-      SettingsCard(
-        title = "About & Privacy",
+        title = "Privacy & Security",
         icon = Icons.Default.Security,
-        subtitle = "Zero data collection, zero telemetry, 100% open source"
+        subtitle = "Zero data collection, zero telemetry, 100% offline"
       ) {
         Column(
           verticalArrangement = Arrangement.spacedBy(12.dp),
           modifier = Modifier.fillMaxWidth()
         ) {
-          // Privacy Banner
           Surface(
             shape = RoundedCornerShape(10.dp),
             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
@@ -372,77 +402,36 @@ fun HiddenSettingsScreen(
               )
               Spacer(modifier = Modifier.width(10.dp))
               Text(
-                text = "Privacy Guarantee: This app does not collect, record, or share any personal data, images, or documents.",
+                text = "pdf_maker runs 100% offline. No analytics, no accounts, and no internet access required.",
                 style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
               )
             }
           }
-
-          // Bullet points / Details
-          Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            AboutPoint(
-              icon = Icons.Default.Lock,
-              title = "No Trackers or Telemetry",
-              description = "There are zero analytics SDKs, zero background trackers, and zero telemetry probes in this app."
-            )
-
-            AboutPoint(
-              icon = Icons.Default.Shield,
-              title = "No Internet Access Required",
-              description = "The app does not declare or use the Android INTERNET permission. It runs 100% locally and offline on your device."
-            )
-
-            AboutPoint(
-              icon = Icons.Default.Info,
-              title = "Open Source PDF & Compression",
-              description = "All image processing, JPEG compression, and PDF generation use native Android Open Source Project (AOSP) libraries (PdfDocument and Skia engine)."
-            )
-          }
-
-          HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-          ) {
-            Text(
-              text = "pdf_maker • Version 1.0",
-              style = MaterialTheme.typography.labelMedium,
-              color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-              text = "Apache 2.0 / AOSP",
-              style = MaterialTheme.typography.labelSmall,
-              color = MaterialTheme.colorScheme.primary,
-              fontWeight = FontWeight.Bold
-            )
-          }
         }
       }
 
-      Spacer(modifier = Modifier.height(24.dp))
+      Spacer(modifier = Modifier.height(28.dp))
     }
   }
 
-  // Edit Save Folder Name Dialog
+  // Edit Folder Dialog
   if (showEditFolderDialog) {
     AlertDialog(
       onDismissRequest = { showEditFolderDialog = false },
-      title = { Text("Change Save Folder") },
+      title = { Text("Set Save Folder Name") },
       text = {
         Column {
           Text(
-            text = "Enter the subfolder name inside Documents:",
+            text = "PDF files will be saved in your phone's Documents folder under this subfolder.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
           )
-          Spacer(modifier = Modifier.height(10.dp))
+          Spacer(modifier = Modifier.height(14.dp))
           OutlinedTextField(
             value = tempFolderName,
             onValueChange = { tempFolderName = it },
+            label = { Text("Folder Name") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
           )
@@ -451,8 +440,9 @@ fun HiddenSettingsScreen(
       confirmButton = {
         TextButton(
           onClick = {
-            if (tempFolderName.isNotBlank()) {
-              onUpdateSettings(currentSettings.copy(defaultSavePath = tempFolderName.trim()))
+            val clean = tempFolderName.trim()
+            if (clean.isNotBlank()) {
+              onUpdateSettings(currentSettings.copy(defaultSavePath = clean))
             }
             showEditFolderDialog = false
           }
@@ -480,10 +470,9 @@ private fun SettingsCard(
     shape = RoundedCornerShape(16.dp),
     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
     modifier = Modifier.fillMaxWidth()
   ) {
-    Column(modifier = Modifier.padding(16.dp)) {
+    Column(modifier = Modifier.padding(18.dp)) {
       Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
           imageVector = icon,
@@ -496,7 +485,8 @@ private fun SettingsCard(
           Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
           )
           Text(
             text = subtitle,
@@ -507,7 +497,7 @@ private fun SettingsCard(
       }
 
       Spacer(modifier = Modifier.height(12.dp))
-      HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+      HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
       Spacer(modifier = Modifier.height(12.dp))
 
       content()
@@ -516,45 +506,116 @@ private fun SettingsCard(
 }
 
 @Composable
-private fun AboutPoint(
-  icon: ImageVector,
-  title: String,
-  description: String
+private fun <T> SettingsDropdownSelector(
+  label: String,
+  options: List<T>,
+  selectedOption: T,
+  optionTitle: (T) -> String,
+  optionSubtitle: ((T) -> String)? = null,
+  leadingContent: (@Composable (T) -> Unit)? = null,
+  onOptionSelected: (T) -> Unit
 ) {
-  Row(
-    modifier = Modifier
-      .fillMaxWidth()
-      .padding(vertical = 4.dp),
-    verticalAlignment = Alignment.Top
-  ) {
-    Box(
+  var expanded by remember { mutableStateOf(false) }
+
+  Box(modifier = Modifier.fillMaxWidth()) {
+    Surface(
+      shape = RoundedCornerShape(12.dp),
+      border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+      color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
       modifier = Modifier
-        .size(32.dp)
-        .padding(top = 2.dp),
-      contentAlignment = Alignment.Center
+        .fillMaxWidth()
+        .clip(RoundedCornerShape(12.dp))
+        .clickable { expanded = true }
     ) {
-      Icon(
-        imageVector = icon,
-        contentDescription = null,
-        tint = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.size(20.dp)
-      )
+      Row(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        leadingContent?.let {
+          it(selectedOption)
+          Spacer(modifier = Modifier.width(12.dp))
+        }
+        Column(modifier = Modifier.weight(1f)) {
+          Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold
+          )
+          Text(
+            text = optionTitle(selectedOption),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+          )
+          optionSubtitle?.let { sub ->
+            val subtitleText = sub(selectedOption)
+            if (subtitleText.isNotBlank()) {
+              Text(
+                text = subtitleText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+              )
+            }
+          }
+        }
+        Icon(
+          imageVector = if (expanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+          contentDescription = "Select $label",
+          tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+      }
     }
-    Spacer(modifier = Modifier.width(10.dp))
-    Column {
-      Text(
-        text = title,
-        style = MaterialTheme.typography.bodyMedium,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.onSurface
-      )
-      Spacer(modifier = Modifier.height(2.dp))
-      Text(
-        text = description,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-      )
+
+    DropdownMenu(
+      expanded = expanded,
+      onDismissRequest = { expanded = false },
+      modifier = Modifier
+        .fillMaxWidth(0.85f)
+        .background(MaterialTheme.colorScheme.surface)
+    ) {
+      options.forEach { option ->
+        val isSelected = option == selectedOption
+        DropdownMenuItem(
+          text = {
+            Column {
+              Text(
+                text = optionTitle(option),
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+              )
+              optionSubtitle?.let { sub ->
+                val s = sub(option)
+                if (s.isNotBlank()) {
+                  Text(
+                    text = s,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                  )
+                }
+              }
+            }
+          },
+          leadingIcon = leadingContent?.let {
+            { it(option) }
+          },
+          trailingIcon = if (isSelected) {
+            {
+              Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+              )
+            }
+          } else null,
+          onClick = {
+            onOptionSelected(option)
+            expanded = false
+          }
+        )
+      }
     }
   }
 }
-

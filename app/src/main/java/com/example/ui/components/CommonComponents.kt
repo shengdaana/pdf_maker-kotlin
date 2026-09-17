@@ -65,21 +65,21 @@ fun ElderActionButton(
   testTag: String = ""
 ) {
   val containerColor = when {
-    isHighContrast && isPrimary -> Color(0xFFB71C1C)
-    isHighContrast && !isPrimary -> Color(0xFFF5F5F5)
+    isHighContrast && isPrimary -> MaterialTheme.colorScheme.primary
+    isHighContrast && !isPrimary -> MaterialTheme.colorScheme.surfaceVariant
     isPrimary -> MaterialTheme.colorScheme.primary
     else -> MaterialTheme.colorScheme.surfaceVariant
   }
 
   val contentColor = when {
-    isHighContrast && isPrimary -> Color.White
-    isHighContrast && !isPrimary -> Color.Black
+    isHighContrast && isPrimary -> MaterialTheme.colorScheme.onPrimary
+    isHighContrast && !isPrimary -> MaterialTheme.colorScheme.onSurface
     isPrimary -> MaterialTheme.colorScheme.onPrimary
     else -> MaterialTheme.colorScheme.onSurfaceVariant
   }
 
   val borderStroke = if (isHighContrast) {
-    BorderStroke(2.dp, Color.Black)
+    BorderStroke(2.dp, MaterialTheme.colorScheme.outline)
   } else if (!isPrimary) {
     BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
   } else {
@@ -90,15 +90,15 @@ fun ElderActionButton(
     onClick = onClick,
     modifier = modifier
       .fillMaxWidth()
-      .height(60.dp)
+      .height(68.dp)
       .testTag(testTag),
-    shape = RoundedCornerShape(16.dp),
+    shape = RoundedCornerShape(18.dp),
     colors = ButtonDefaults.buttonColors(
       containerColor = containerColor,
       contentColor = contentColor
     ),
     border = borderStroke,
-    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp)
+    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp)
   ) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
@@ -108,13 +108,13 @@ fun ElderActionButton(
         Icon(
           imageVector = icon,
           contentDescription = null,
-          modifier = Modifier.size(28.dp)
+          modifier = Modifier.size(30.dp)
         )
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(14.dp))
       }
       Text(
         text = text,
-        fontSize = if (isHighContrast) 20.sp else 18.sp,
+        fontSize = if (isHighContrast) 22.sp else 20.sp,
         fontWeight = FontWeight.Bold,
         textAlign = TextAlign.Center
       )

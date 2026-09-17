@@ -19,35 +19,43 @@ class PdfService {
     final pdf = pw.Document();
 
     for (final page in pages) {
-      final file = File(page.path);
-      final rawBytes = await file.readAsBytes();
-
-      // Decode and process image (rotation & compression)
-      img.Image? decoded = img.decodeImage(rawBytes);
-      if (decoded != null) {
-        if (page.rotationDegrees != 0) {
-          decoded = img.copyRotate(decoded, angle: page.rotationDegrees);
+      if (page.isMerged && page.originalPages != null && page.originalPages!.length >= 2) {
+        final img1 = await _processImagePage(page.originalPages![0], quality);
+        final img2 = await _processImagePage(page.originalPages![1], quality);
+        if (img1 != null && img2 != null) {
+          final margin = marginOption == PageMarginOption.bordered ? 24.0 : 0.0;
+          pdf.addPage(
+            pw.Page(
+              pageFormat: PdfPageFormat.a4,
+              margin: pw.EdgeInsets.all(margin),
+              build: (pw.Context context) {
+                return pw.Column(
+                  children: [
+                    pw.Expanded(
+                      child: pw.Center(
+                        child: pw.Image(img1, fit: pw.BoxFit.contain),
+                      ),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(vertical: 6),
+                      child: pw.Divider(color: PdfColors.grey400, thickness: 0.8),
+                    ),
+                    pw.Expanded(
+                      child: pw.Center(
+                        child: pw.Image(img2, fit: pw.BoxFit.contain),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          );
+          continue;
         }
+      }
 
-        // Compress if standard quality selected
-        List<int> processedBytes;
-        if (quality == PdfQuality.standard) {
-          // Standard quality: compress to JPEG with 80% quality, resize if wider than 1600px
-          if (decoded.width > 1600 || decoded.height > 1600) {
-            decoded = img.copyResize(
-              decoded,
-              width: decoded.width > decoded.height ? 1600 : null,
-              height: decoded.height >= decoded.width ? 1600 : null,
-            );
-          }
-          processedBytes = img.encodeJpg(decoded, quality: 80);
-        } else {
-          // Original quality: minimal recompression
-          processedBytes = img.encodeJpg(decoded, quality: 95);
-        }
-
-        final pdfImage = pw.MemoryImage(Uint8List.fromList(processedBytes));
-
+      final pdfImage = await _processImagePage(page, quality);
+      if (pdfImage != null) {
         // Margin calculation
         final margin = marginOption == PageMarginOption.bordered ? 24.0 : 0.0;
 
@@ -126,5 +134,34 @@ class PdfService {
     } catch (_) {
       return [];
     }
+  }
+
+  static Future<pw.MemoryImage?> _processImagePage(ImagePage page, PdfQuality quality) async {
+    final file = File(page.path);
+    if (!await file.exists()) return null;
+    final rawBytes = await file.readAsBytes();
+
+    img.Image? decoded = img.decodeImage(rawBytes);
+    if (decoded == null) return null;
+
+    if (page.rotationDegrees != 0) {
+      decoded = img.copyRotate(decoded, angle: page.rotationDegrees);
+    }
+
+    List<int> processedBytes;
+    if (quality == PdfQuality.standard) {
+      if (decoded.width > 1600 || decoded.height > 1600) {
+        decoded = img.copyResize(
+          decoded,
+          width: decoded.width > decoded.height ? 1600 : null,
+          height: decoded.height >= decoded.width ? 1600 : null,
+        );
+      }
+      processedBytes = img.encodeJpg(decoded, quality: 80);
+    } else {
+      processedBytes = img.encodeJpg(decoded, quality: 95);
+    }
+
+    return pw.MemoryImage(Uint8List.fromList(processedBytes));
   }
 }

@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.sp
 import com.example.model.DeveloperSettings
 import com.example.model.GeneratedPdf
 import com.example.ui.components.ElderActionButton
+import com.example.util.AppStrings
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -134,22 +135,22 @@ fun HomeScreen(
         .padding(horizontal = 24.dp),
       horizontalAlignment = Alignment.CenterHorizontally
     ) {
-      Spacer(modifier = Modifier.height(24.dp))
+      Spacer(modifier = Modifier.height(28.dp))
 
-      // Friendly hero banner for elders
+      // Friendly hero banner
       Surface(
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-        border = if (settings.highContrastMode) BorderStroke(2.dp, Color.Black) else null,
+        border = if (settings.highContrastMode) BorderStroke(2.dp, MaterialTheme.colorScheme.outline) else null,
         modifier = Modifier.fillMaxWidth()
       ) {
         Column(
-          modifier = Modifier.padding(24.dp),
+          modifier = Modifier.padding(28.dp),
           horizontalAlignment = Alignment.CenterHorizontally
         ) {
           Box(
             modifier = Modifier
-              .size(80.dp)
+              .size(84.dp)
               .clip(CircleShape)
               .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
@@ -158,24 +159,24 @@ fun HomeScreen(
               imageVector = Icons.Default.PhotoLibrary,
               contentDescription = null,
               tint = MaterialTheme.colorScheme.primary,
-              modifier = Modifier.size(44.dp)
+              modifier = Modifier.size(48.dp)
             )
           }
 
-          Spacer(modifier = Modifier.height(16.dp))
+          Spacer(modifier = Modifier.height(20.dp))
 
           Text(
-            text = "Convert Photos to PDF",
+            text = AppStrings.get(settings.language, "home_banner_title"),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurface
           )
 
-          Spacer(modifier = Modifier.height(8.dp))
+          Spacer(modifier = Modifier.height(10.dp))
 
           Text(
-            text = "Select any photos from your phone gallery to create a clean A4 PDF file to send on WhatsApp or save.",
+            text = AppStrings.get(settings.language, "home_banner_desc"),
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -183,11 +184,11 @@ fun HomeScreen(
         }
       }
 
-      Spacer(modifier = Modifier.height(28.dp))
+      Spacer(modifier = Modifier.height(36.dp))
 
       // PRIMARY ACTION BUTTON: Select From Gallery
       ElderActionButton(
-        text = "Select From Gallery",
+        text = AppStrings.get(settings.language, "select_from_gallery"),
         icon = Icons.Default.PhotoLibrary,
         onClick = {
           galleryLauncher.launch(
@@ -199,11 +200,11 @@ fun HomeScreen(
         testTag = "select_from_gallery_button"
       )
 
-      Spacer(modifier = Modifier.height(14.dp))
+      Spacer(modifier = Modifier.height(18.dp))
 
       // SECONDARY ACTION BUTTON: See Generated PDFs
       ElderActionButton(
-        text = "See Generated PDFs",
+        text = AppStrings.get(settings.language, "see_generated_pdfs"),
         icon = Icons.Default.Description,
         onClick = onSeeGeneratedPdfs,
         isPrimary = false,
@@ -211,69 +212,17 @@ fun HomeScreen(
         testTag = "see_generated_pdfs_button"
       )
 
-      Spacer(modifier = Modifier.height(28.dp))
+      Spacer(modifier = Modifier.weight(1f))
 
-      // Section: Recent Created PDFs
-      if (recentPdfs.isNotEmpty()) {
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-              imageVector = Icons.Default.FolderOpen,
-              contentDescription = null,
-              tint = MaterialTheme.colorScheme.primary,
-              modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-              text = "Recent PDFs (${recentPdfs.size})",
-              style = MaterialTheme.typography.titleSmall,
-              fontWeight = FontWeight.Bold,
-              color = MaterialTheme.colorScheme.onSurface
-            )
-          }
-
-          TextButton(
-            onClick = onSeeGeneratedPdfs,
-            modifier = Modifier.testTag("home_view_all_pdfs_button")
-          ) {
-            Text(
-              text = "View All",
-              fontWeight = FontWeight.Bold,
-              style = MaterialTheme.typography.labelLarge
-            )
-          }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        LazyColumn(
-          modifier = Modifier.fillMaxWidth().weight(1f),
-          verticalArrangement = Arrangement.spacedBy(10.dp),
-          contentPadding = PaddingValues(bottom = 24.dp)
-        ) {
-          items(recentPdfs) { pdf ->
-            RecentPdfItemCard(
-              pdf = pdf,
-              highContrast = settings.highContrastMode,
-              onOpen = { onOpenPdf(pdf) },
-              onShare = { onSharePdf(pdf) }
-            )
-          }
-        }
-      } else {
-        Spacer(modifier = Modifier.weight(1f))
-        Text(
-          text = "Tip: You can also select photos directly in your Gallery and tap 'Share' -> 'pdf_maker'!",
-          style = MaterialTheme.typography.bodySmall,
-          textAlign = TextAlign.Center,
-          color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-          modifier = Modifier.padding(bottom = 24.dp)
-        )
-      }
+      Text(
+        text = AppStrings.get(settings.language, "tip_share"),
+        style = MaterialTheme.typography.bodySmall,
+        textAlign = TextAlign.Center,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+        modifier = Modifier
+          .padding(bottom = 28.dp)
+          .padding(horizontal = 12.dp)
+      )
     }
   }
 }

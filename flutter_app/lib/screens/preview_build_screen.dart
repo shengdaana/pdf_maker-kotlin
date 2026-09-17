@@ -68,6 +68,44 @@ class _PreviewBuildScreenState extends State<PreviewBuildScreen> {
     }
   }
 
+  void _mergePages(int index) {
+    if (index >= _pages.length - 1) return;
+    setState(() {
+      final p1 = _pages[index];
+      final p2 = _pages[index + 1];
+      final mergedPage = ImagePage(
+        id: 'merged_${p1.id}_${p2.id}',
+        path: p1.path,
+        isMerged: true,
+        originalPages: [p1, p2],
+      );
+      _pages.removeAt(index + 1);
+      _pages[index] = mergedPage;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Merged 2 photos onto a single PDF page!'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _unmergePage(int index) {
+    final page = _pages[index];
+    if (!page.isMerged || page.originalPages == null || page.originalPages!.isEmpty) return;
+    setState(() {
+      final orig = page.originalPages!;
+      _pages.removeAt(index);
+      _pages.insertAll(index, orig);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Page split back into separate individual pages.'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
   Future<void> _addMorePhotos() async {
     final List<XFile> picked = await _picker.pickMultiImage();
     if (picked.isNotEmpty) {
@@ -222,76 +260,148 @@ class _PreviewBuildScreenState extends State<PreviewBuildScreen> {
               ),
             )
           : ListView.builder(
+              key: const PageStorageKey<String>('preview_pages_list_storage'),
               padding: const EdgeInsets.all(16),
               itemCount: _pages.length,
               itemBuilder: (context, index) {
                 final page = _pages[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Row(
-                      children: [
-                        // Page badge
-                        Container(
-                          width: 28,
-                          height: 28,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF006686),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Text(
-                              '${index + 1}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
+                return Column(
+                  children: [
+                    Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Row(
+                          children: [
+                            // Page badge
+                            Container(
+                              width: 28,
+                              height: 28,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF006686),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '${index + 1}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        // Thumbnail with rotation
-                        RotatedBox(
-                          quarterTurns: page.rotationDegrees ~/ 90,
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.file(
-                              File(page.path),
-                              width: 64,
-                              height: 64,
-                              fit: BoxFit.cover,
+                            const SizedBox(width: 10),
+
+                            // Merged badge if merged
+                            if (page.isMerged)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.shade100,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.amber.shade700),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.merge_type, size: 14, color: Colors.amber.shade900),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Merged (2 Photos)',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.amber.shade900,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                            const SizedBox(width: 8),
+
+                            // Thumbnail with rotation
+                            RotatedBox(
+                              quarterTurns: page.rotationDegrees ~/ 90,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.file(
+                                  File(page.path),
+                                  width: 56,
+                                  height: 56,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
                             ),
-                          ),
+                            const Spacer(),
+
+                            // If merged, show Split button
+                            if (page.isMerged && page.originalPages != null)
+                              TextButton.icon(
+                                icon: const Icon(Icons.call_split, size: 16),
+                                label: const Text('Split', style: TextStyle(fontSize: 12)),
+                                onPressed: () => _unmergePage(index),
+                              ),
+
+                            // Actions: Rotate, Up, Down, Delete
+                            IconButton(
+                              icon: const Icon(Icons.rotate_right),
+                              onPressed: () => _rotatePage(index),
+                              tooltip: 'Rotate',
+                            ),
+                            if (!widget.settings.simplifiedMode) ...[
+                              IconButton(
+                                icon: const Icon(Icons.arrow_upward),
+                                onPressed: index > 0 ? () => _moveUp(index) : null,
+                                tooltip: 'Move Up',
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.arrow_downward),
+                                onPressed: index < _pages.length - 1
+                                    ? () => _moveDown(index)
+                                    : null,
+                                tooltip: 'Move Down',
+                              ),
+                            ],
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              onPressed: () => _removePage(index),
+                              tooltip: 'Delete',
+                            ),
+                          ],
                         ),
-                        const Spacer(),
-                        // Actions: Rotate, Up, Down, Delete
-                        IconButton(
-                          icon: const Icon(Icons.rotate_right),
-                          onPressed: () => _rotatePage(index),
-                          tooltip: 'Rotate',
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.arrow_upward),
-                          onPressed: index > 0 ? () => _moveUp(index) : null,
-                          tooltip: 'Move Up',
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.arrow_downward),
-                          onPressed: index < _pages.length - 1
-                              ? () => _moveDown(index)
-                              : null,
-                          tooltip: 'Move Down',
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline,
-                              color: Colors.red),
-                          onPressed: () => _removePage(index),
-                          tooltip: 'Delete',
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
+
+                    // Merge pages between pages button if enabled
+                    if (widget.settings.enableMergePages && index < _pages.length - 1)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Expanded(child: Divider()),
+                            const SizedBox(width: 8),
+                            OutlinedButton.icon(
+                              icon: const Icon(Icons.merge_type, size: 16),
+                              label: Text(
+                                'Merge Pages (${index + 1} + ${index + 2})',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              ),
+                              onPressed: () => _mergePages(index),
+                            ),
+                            const SizedBox(width: 8),
+                            const Expanded(child: Divider()),
+                          ],
+                        ),
+                      ),
+                  ],
                 );
               },
             ),

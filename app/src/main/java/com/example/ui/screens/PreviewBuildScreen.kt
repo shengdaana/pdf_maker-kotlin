@@ -22,16 +22,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CallSplit
 import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.MergeType
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material3.Button
@@ -40,13 +44,16 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -63,18 +70,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.model.AppLanguage
 import com.example.model.DeveloperSettings
 import com.example.model.ImagePage
+import com.example.util.AppStrings
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PreviewBuildScreen(
   pages: List<ImagePage>,
   settings: DeveloperSettings,
+  listState: LazyListState = rememberLazyListState(),
   onAddMorePhotos: (List<Uri>) -> Unit,
   onMoveUp: (Int) -> Unit,
   onMoveDown: (Int) -> Unit,
   onRemovePage: (Int) -> Unit,
+  onMergePages: (Int) -> Unit,
+  onUnmergePage: (Int) -> Unit,
   onTapCrop: (String) -> Unit,
   onGeneratePdfClicked: () -> Unit,
   onBackPressed: () -> Unit
@@ -149,7 +161,7 @@ fun PreviewBuildScreen(
               },
               shape = RoundedCornerShape(14.dp),
               modifier = Modifier
-                .height(56.dp)
+                .height(58.dp)
                 .testTag("add_more_images_button"),
               colors = ButtonDefaults.filledTonalButtonColors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -163,7 +175,7 @@ fun PreviewBuildScreen(
               )
               Spacer(modifier = Modifier.width(6.dp))
               Text(
-                text = "Add Photos",
+                text = AppStrings.get(settings.language, "add_more_photos"),
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp
               )
@@ -174,13 +186,13 @@ fun PreviewBuildScreen(
               onClick = onGeneratePdfClicked,
               shape = RoundedCornerShape(14.dp),
               colors = ButtonDefaults.buttonColors(
-                containerColor = if (settings.highContrastMode) Color(0xFFB71C1C) else MaterialTheme.colorScheme.primary,
-                contentColor = Color.White
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
               ),
-              border = if (settings.highContrastMode) BorderStroke(2.dp, Color.Black) else null,
+              border = if (settings.highContrastMode) BorderStroke(2.dp, MaterialTheme.colorScheme.outline) else null,
               modifier = Modifier
                 .weight(1f)
-                .height(56.dp)
+                .height(58.dp)
                 .testTag("generate_pdf_button")
             ) {
               Icon(
@@ -190,7 +202,7 @@ fun PreviewBuildScreen(
               )
               Spacer(modifier = Modifier.width(8.dp))
               Text(
-                text = "Generate PDF",
+                text = AppStrings.get(settings.language, "create_pdf_button"),
                 fontWeight = FontWeight.Bold,
                 fontSize = if (settings.highContrastMode) 18.sp else 16.sp
               )
@@ -202,6 +214,7 @@ fun PreviewBuildScreen(
     containerColor = MaterialTheme.colorScheme.background
   ) { innerPadding ->
     LazyColumn(
+      state = listState,
       modifier = Modifier
         .fillMaxSize()
         .padding(innerPadding)
@@ -209,7 +222,7 @@ fun PreviewBuildScreen(
       verticalArrangement = Arrangement.spacedBy(16.dp),
       contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp)
     ) {
-      item {
+      item(key = "header_instruction_banner") {
         Surface(
           shape = RoundedCornerShape(12.dp),
           color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
@@ -243,11 +256,25 @@ fun PreviewBuildScreen(
           page = page,
           simplifiedMode = settings.simplifiedMode,
           highContrast = settings.highContrastMode,
+          language = settings.language,
           onMoveUp = { onMoveUp(index) },
           onMoveDown = { onMoveDown(index) },
           onRemove = { onRemovePage(index) },
+          onUnmerge = { onUnmergePage(index) },
           onTapCrop = { onTapCrop(page.id) }
         )
+
+        // Show merge button between this page and the next page when enabled
+        if (settings.enableMergePages && index < pages.size - 1) {
+          Spacer(modifier = Modifier.height(6.dp))
+          MergeBetweenPagesDivider(
+            pageNumber1 = index + 1,
+            pageNumber2 = index + 2,
+            language = settings.language,
+            onMerge = { onMergePages(index) }
+          )
+          Spacer(modifier = Modifier.height(6.dp))
+        }
       }
     }
   }
@@ -260,9 +287,11 @@ fun PageCardItem(
   page: ImagePage,
   simplifiedMode: Boolean,
   highContrast: Boolean,
+  language: AppLanguage,
   onMoveUp: () -> Unit,
   onMoveDown: () -> Unit,
   onRemove: () -> Unit,
+  onUnmerge: () -> Unit,
   onTapCrop: () -> Unit
 ) {
   val context = LocalContext.current
@@ -277,26 +306,77 @@ fun PageCardItem(
       .testTag("page_card_$pageIndex")
   ) {
     Column(modifier = Modifier.padding(12.dp)) {
-      // Top row: Page number header & delete button
+      // Top row: Page number header & delete button & merged indicators
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
       ) {
-        Surface(
-          shape = RoundedCornerShape(8.dp),
-          color = MaterialTheme.colorScheme.primary
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-          Text(
-            text = "Page ${pageIndex + 1} of $totalPages",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = Color.White,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-          )
+          Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.primary
+          ) {
+            Text(
+              text = "Page ${pageIndex + 1} of $totalPages",
+              style = MaterialTheme.typography.labelMedium,
+              fontWeight = FontWeight.Bold,
+              color = Color.White,
+              modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+            )
+          }
+
+          if (page.isMerged) {
+            Surface(
+              shape = RoundedCornerShape(8.dp),
+              color = MaterialTheme.colorScheme.tertiaryContainer
+            ) {
+              Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                Icon(
+                  imageVector = Icons.Default.MergeType,
+                  contentDescription = null,
+                  tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                  modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                  text = AppStrings.get(language, "merged_badge"),
+                  style = MaterialTheme.typography.labelSmall,
+                  fontWeight = FontWeight.Bold,
+                  color = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+              }
+            }
+          }
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {
+          if (page.isMerged && page.originalPages != null) {
+            TextButton(
+              onClick = onUnmerge,
+              contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+            ) {
+              Icon(
+                imageVector = Icons.Default.CallSplit,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp)
+              )
+              Spacer(modifier = Modifier.width(4.dp))
+              Text(
+                text = AppStrings.get(language, "unmerge_page_btn"),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold
+              )
+            }
+            Spacer(modifier = Modifier.width(4.dp))
+          }
+
           // Tap to edit / crop label
           Surface(
             shape = RoundedCornerShape(8.dp),
@@ -440,5 +520,60 @@ fun PageCardItem(
         }
       }
     }
+  }
+}
+
+@Composable
+fun MergeBetweenPagesDivider(
+  pageNumber1: Int,
+  pageNumber2: Int,
+  language: AppLanguage,
+  onMerge: () -> Unit
+) {
+  Row(
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(vertical = 4.dp, horizontal = 8.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.Center
+  ) {
+    HorizontalDivider(
+      modifier = Modifier.weight(1f),
+      color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
+    )
+
+    Spacer(modifier = Modifier.width(8.dp))
+
+    OutlinedButton(
+      onClick = onMerge,
+      shape = RoundedCornerShape(20.dp),
+      colors = ButtonDefaults.outlinedButtonColors(
+        containerColor = MaterialTheme.colorScheme.surface
+      ),
+      border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+      contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+      modifier = Modifier.testTag("merge_pages_button_${pageNumber1}_$pageNumber2")
+    ) {
+      Icon(
+        imageVector = Icons.Default.MergeType,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.size(16.dp)
+      )
+      Spacer(modifier = Modifier.width(6.dp))
+      Text(
+        text = "${AppStrings.get(language, "merge_pages_btn")} ($pageNumber1 + $pageNumber2)",
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary
+      )
+    }
+
+    Spacer(modifier = Modifier.width(8.dp))
+
+    HorizontalDivider(
+      modifier = Modifier.weight(1f),
+      color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
+    )
   }
 }

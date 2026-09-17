@@ -13,6 +13,7 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -60,7 +61,15 @@ class MainActivity : ComponentActivity() {
       val statusMessage by viewModel.statusMessage.collectAsState()
 
       val snackbarHostState = remember { SnackbarHostState() }
+      val previewListState = rememberLazyListState()
       val context = LocalContext.current
+
+      // Reset scroll to top when starting a fresh list of pages
+      LaunchedEffect(pages.isEmpty()) {
+        if (pages.isEmpty()) {
+          previewListState.scrollToItem(0)
+        }
+      }
 
       LaunchedEffect(statusMessage) {
         statusMessage?.let { msg ->
@@ -70,7 +79,7 @@ class MainActivity : ComponentActivity() {
       }
 
       MyApplicationTheme(
-        highContrast = currentSettings.highContrastMode
+        theme = currentSettings.theme
       ) {
         Scaffold(
           modifier = Modifier.fillMaxSize(),
@@ -105,10 +114,13 @@ class MainActivity : ComponentActivity() {
                 PreviewBuildScreen(
                   pages = pages,
                   settings = currentSettings,
+                  listState = previewListState,
                   onAddMorePhotos = { uris -> viewModel.addImages(uris) },
                   onMoveUp = { index -> viewModel.movePageUp(index) },
                   onMoveDown = { index -> viewModel.movePageDown(index) },
                   onRemovePage = { index -> viewModel.removePage(index) },
+                  onMergePages = { index -> viewModel.mergePages(index) },
+                  onUnmergePage = { index -> viewModel.unmergePage(index) },
                   onTapCrop = { pageId -> viewModel.navigateTo(AppScreen.CropEditor(pageId)) },
                   onGeneratePdfClicked = { viewModel.onGeneratePdfClicked() },
                   onBackPressed = { viewModel.navigateTo(AppScreen.Home) }
@@ -124,10 +136,12 @@ class MainActivity : ComponentActivity() {
                 if (editingPage != null) {
                   CropEditorScreen(
                     page = editingPage,
-                    onSave = { rotation, cropRatio, autoTrim ->
+                    language = currentSettings.language,
+                    onSave = { rotation, cropRect, cropRatio, autoTrim ->
                       viewModel.updatePageCrop(
                         pageId = editingPage.id,
                         rotationDegrees = rotation,
+                        cropRect = cropRect,
                         cropAspectRatio = cropRatio,
                         autoTrim = autoTrim
                       )
@@ -170,7 +184,7 @@ class MainActivity : ComponentActivity() {
                 HiddenSettingsScreen(
                   currentSettings = currentSettings,
                   onUpdateSettings = { newSettings -> viewModel.updateSettings(newSettings) },
-                  onBackPressed = { viewModel.navigateTo(AppScreen.Home) }
+                  onBack = { viewModel.navigateTo(AppScreen.Home) }
                 )
               }
 

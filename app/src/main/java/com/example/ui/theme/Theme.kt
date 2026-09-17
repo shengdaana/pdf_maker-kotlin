@@ -1,37 +1,18 @@
 package com.example.ui.theme
 
-import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import com.example.model.AppTheme
 
-private val DarkColorScheme = darkColorScheme(
-  primary = Color(0xFFEF5350),
-  onPrimary = Color(0xFF5F0004),
-  primaryContainer = Color(0xFF8E0000),
-  onPrimaryContainer = Color(0xFFFFCDD2),
-  secondary = Color(0xFFE0E0E0),
-  onSecondary = Color(0xFF212121),
-  background = Color(0xFF121212),
-  surface = Color(0xFF1E1E1E),
-  surfaceVariant = Color(0xFF2C2C2C),
-  onBackground = Color(0xFFE0E0E0),
-  onSurface = Color(0xFFE0E0E0),
-  outline = Color(0xFF757575)
-)
-
-private val LightColorScheme = lightColorScheme(
-  primary = PdfRedPrimary,
+private val PurpleColorScheme = lightColorScheme(
+  primary = PurplePrimary,
   onPrimary = Color.White,
-  primaryContainer = PdfRedContainer,
-  onPrimaryContainer = PdfOnRedContainer,
-  secondary = PdfSlate700,
+  primaryContainer = PurpleContainer,
+  onPrimaryContainer = PurpleOnContainer,
+  secondary = PurpleDark,
   onSecondary = Color.White,
   background = PdfSlate50,
   surface = Color.White,
@@ -41,36 +22,77 @@ private val LightColorScheme = lightColorScheme(
   outline = Color(0xFFCBD5E1)
 )
 
-private val HighContrastScheme = lightColorScheme(
-  primary = ElderHighContrastRed,
+private val LightGreenColorScheme = lightColorScheme(
+  primary = GreenPrimary,
   onPrimary = Color.White,
-  primaryContainer = Color(0xFFFFCDD2),
-  onPrimaryContainer = ElderBlack,
-  secondary = ElderBlack,
+  primaryContainer = GreenContainer,
+  onPrimaryContainer = GreenOnContainer,
+  secondary = GreenDark,
   onSecondary = Color.White,
-  background = Color.White,
+  background = Color(0xFFF9FBFA),
   surface = Color.White,
-  surfaceVariant = Color(0xFFF5F5F5),
-  onBackground = ElderBlack,
-  onSurface = ElderBlack,
-  outline = ElderBlack
+  surfaceVariant = Color(0xFFE8F5E9),
+  onBackground = Color(0xFF0F172A),
+  onSurface = Color(0xFF0F172A),
+  outline = Color(0xFFA7F3D0)
+)
+
+private val PinkColorScheme = lightColorScheme(
+  primary = PinkPrimary,
+  onPrimary = Color.White,
+  primaryContainer = PinkContainer,
+  onPrimaryContainer = PinkOnContainer,
+  secondary = PinkDark,
+  onSecondary = Color.White,
+  background = Color(0xFFFDF8F9),
+  surface = Color.White,
+  surfaceVariant = Color(0xFFFCE4EC),
+  onBackground = Color(0xFF1E293B),
+  onSurface = Color(0xFF1E293B),
+  outline = Color(0xFFFBCFE8)
+)
+
+private val CobaltBlueColorScheme = lightColorScheme(
+  primary = CobaltPrimary,
+  onPrimary = Color.White,
+  primaryContainer = CobaltContainer,
+  onPrimaryContainer = CobaltOnContainer,
+  secondary = CobaltDark,
+  onSecondary = Color.White,
+  background = Color(0xFFF8FAFC),
+  surface = Color.White,
+  surfaceVariant = Color(0xFFE0E7FF),
+  onBackground = Color(0xFF0F172A),
+  onSurface = Color(0xFF0F172A),
+  outline = Color(0xFFBFDBFE)
+)
+
+private val HighContrastDarkColorScheme = darkColorScheme(
+  primary = ElderYellowAccent,
+  onPrimary = ElderBlack,
+  primaryContainer = Color(0xFF333333),
+  onPrimaryContainer = Color.White,
+  secondary = Color.White,
+  onSecondary = ElderBlack,
+  background = ElderBlack,
+  surface = ElderOledSurface,
+  surfaceVariant = ElderOledCard,
+  onBackground = Color.White,
+  onSurface = Color.White,
+  outline = ElderHighContrastBorder
 )
 
 @Composable
 fun MyApplicationTheme(
-  darkTheme: Boolean = isSystemInDarkTheme(),
-  highContrast: Boolean = false,
-  dynamicColor: Boolean = false, // Keep consistent PDF red brand by default
+  theme: AppTheme = AppTheme.PURPLE,
   content: @Composable () -> Unit
 ) {
-  val context = LocalContext.current
-  val colorScheme = when {
-    highContrast -> HighContrastScheme
-    dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-      if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-    }
-    darkTheme -> DarkColorScheme
-    else -> LightColorScheme
+  val colorScheme = when (theme) {
+    AppTheme.PURPLE -> PurpleColorScheme
+    AppTheme.LIGHT_GREEN -> LightGreenColorScheme
+    AppTheme.PINK -> PinkColorScheme
+    AppTheme.COBALT_BLUE -> CobaltBlueColorScheme
+    AppTheme.HIGH_CONTRAST_DARK -> HighContrastDarkColorScheme
   }
 
   MaterialTheme(
@@ -79,3 +101,4 @@ fun MyApplicationTheme(
     content = content
   )
 }
+
