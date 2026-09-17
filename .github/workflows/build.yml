@@ -22,29 +22,37 @@ jobs:
           distribution: 'zulu'
           java-version: '21'
 
-      - name: Decode or Generate Debug Keystore
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK Licenses
         run: |
+          yes | sdkmanager --licenses || true
+
+      - name: Prepare Environment and Keystore
+        run: |
+          # Ensure .env exists for Secrets Gradle Plugin
+          if [ -f .env.example ]; then
+            cp .env.example .env
+          else
+            touch .env
+          fi
+
+          # Decode or create debug.keystore
           if [ -f debug.keystore.base64 ]; then
             base64 -d debug.keystore.base64 > debug.keystore
           elif [ ! -f debug.keystore ]; then
             keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
 
-      - name: Set up Gradle
+      - name: Set up Gradle 9.3.1
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.3.1'
 
-      - name: Grant Execute Permission for Gradlew
-        run: chmod +x gradlew || true
-
       - name: Build Debug APK
         run: |
-          if [ -f ./gradlew ]; then
-            ./gradlew assembleDebug --no-daemon --stacktrace
-          else
-            gradle assembleDebug --no-daemon --stacktrace
-          fi
+          gradle assembleDebug --no-daemon --stacktrace
 
       - name: Upload Native APK Artifact
         uses: actions/upload-artifact@v4
@@ -70,8 +78,13 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.27.x'
           channel: 'stable'
           cache: true
+
+      - name: Accept Android SDK Licenses for Flutter
+        run: |
+          yes | flutter doctor --android-licenses || true
 
       - name: Install Flutter Dependencies
         run: |
