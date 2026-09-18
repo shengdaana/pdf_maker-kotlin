@@ -108,8 +108,7 @@ object PdfGenerator {
 
             // Force bitmap to stretch directly across full page bounds with zero white or black margins
             val destRect = RectF(0f, 0f, pageInfo.pageWidth.toFloat(), pageInfo.pageHeight.toFloat())
-            val drawPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-            canvas.drawBitmap(finalBitmap, null, destRect, drawPaint)
+            canvas.drawBitmap(finalBitmap, null, destRect, paint)
             pdfDocument.finishPage(pdfPage)
           } else {
             // MODE 2: A4 STANDARD
@@ -133,8 +132,7 @@ object PdfGenerator {
             val destTop = marginPoints + (availableHeight - destHeight) / 2f
             val destRect = RectF(destLeft, destTop, destLeft + destWidth, destTop + destHeight)
 
-            val drawPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-            canvas.drawBitmap(finalBitmap, null, destRect, drawPaint)
+            canvas.drawBitmap(finalBitmap, null, destRect, paint)
             pdfDocument.finishPage(pdfPage)
           }
 
