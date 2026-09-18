@@ -21,16 +21,20 @@ gallery select photos click share select pdf_maker app and hit generate pdf.
 - works offline
 ## Screenshots
 
-<img width="1544" height="1960" alt="Screenshot_2026-09-18-18-59-30-091_com android intentresolver-edit" src="https://github.com/user-attachments/assets/603def97-ee8b-441b-aafb-3e174eb36fb7" />
-<img width="2125" height="3090" alt="Screenshot_2026-09-18-17-48-58-686_com aistudio pdfmaker zqpv" src="https://github.com/user-attachments/assets/d4ad8ba6-43f3-4ccc-8c5a-d7b73b0c3b08" />
-<img width="2114" height="3027" alt="Screenshot_2026-09-18-17-49-56-358_com aistudio pdfmaker zqpv" src="https://github.com/user-attachments/assets/fa3cce51-a345-4b62-9af2-0fb010530386" />
-<img width="2122" height="3027" alt="Screenshot_2026-09-18-17-50-43-894_com aistudio pdfmaker zqpv" src="https://github.com/user-attachments/assets/b1cb3457-3eb3-40e4-98fc-8eda651a7ffa" />
-<img width="2131" height="1311" alt="Screenshot_2026-09-18-17-51-28-630_com aistudio pdfmaker zqpv" src="https://github.com/user-attachments/assets/24e796b3-91a7-432a-a311-3b7a217a323a" />
-<img width="2076" height="2928" alt="Screenshot_2026-09-18-17-46-08-586_com aistudio pdfmaker zqpv" src="https://github.com/user-attachments/assets/46dc0784-cb8b-4056-bf8b-da3834c89f5d" />
-<img width="2113" height="3041" alt="Screenshot_2026-09-18-17-48-28-107_com google android photopicker" src="https://github.com/user-attachments/assets/c0c65b8c-71e7-4c43-b3c4-d9073c6fa883" />
-<img width="2097" height="2985" alt="Screenshot_2026-09-18-17-47-02-628_com aistudio pdfmaker zqpv" src="https://github.com/user-attachments/assets/22905b1f-91ef-46ed-9abe-ddb84f0ab84f" />
-
-
+<table>
+  <tr>
+<td><img width="1544" height="1960" alt="Screenshot_2026-09-18-18-59-30-091_com android intentresolver-edit" src="https://github.com/user-attachments/assets/603def97-ee8b-441b-aafb-3e174eb36fb7" /></td>
+<td><img width="2125" height="3090" alt="Screenshot_2026-09-18-17-48-58-686_com aistudio pdfmaker zqpv" src="https://github.com/user-attachments/assets/d4ad8ba6-43f3-4ccc-8c5a-d7b73b0c3b08" /></td>
+<td><img width="2114" height="3027" alt="Screenshot_2026-09-18-17-49-56-358_com aistudio pdfmaker zqpv" src="https://github.com/user-attachments/assets/fa3cce51-a345-4b62-9af2-0fb010530386" /></td>
+<td><img width="2122" height="3027" alt="Screenshot_2026-09-18-17-50-43-894_com aistudio pdfmaker zqpv" src="https://github.com/user-attachments/assets/b1cb3457-3eb3-40e4-98fc-8eda651a7ffa" /></td>
+  </tr>
+  <tr>
+<td><img width="2131" height="1311" alt="Screenshot_2026-09-18-17-51-28-630_com aistudio pdfmaker zqpv" src="https://github.com/user-attachments/assets/24e796b3-91a7-432a-a311-3b7a217a323a" /></td>
+<td><img width="2076" height="2928" alt="Screenshot_2026-09-18-17-46-08-586_com aistudio pdfmaker zqpv" src="https://github.com/user-attachments/assets/46dc0784-cb8b-4056-bf8b-da3834c89f5d" /></td>
+<td><img width="2113" height="3041" alt="Screenshot_2026-09-18-17-48-28-107_com google android photopicker" src="https://github.com/user-attachments/assets/c0c65b8c-71e7-4c43-b3c4-d9073c6fa883" /></td>
+<td><img width="2097" height="2985" alt="Screenshot_2026-09-18-17-47-02-628_com aistudio pdfmaker zqpv" src="https://github.com/user-attachments/assets/22905b1f-91ef-46ed-9abe-ddb84f0ab84f" /></td>
+  </tr>
+</table>
 ## Download
 
 Go to the **Releases** section to download the latest APK.
