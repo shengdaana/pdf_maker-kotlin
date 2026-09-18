@@ -83,6 +83,7 @@ class MainActivity : ComponentActivity() {
       ) {
         Scaffold(
           modifier = Modifier.fillMaxSize(),
+          contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
           snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { innerPadding ->
           Box(

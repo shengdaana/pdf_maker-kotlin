@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -161,25 +163,27 @@ fun PreviewBuildScreen(
               },
               shape = RoundedCornerShape(14.dp),
               modifier = Modifier
-                .height(58.dp)
+                .defaultMinSize(minHeight = 52.dp)
+                .wrapContentHeight()
                 .testTag("add_more_images_button"),
               colors = ButtonDefaults.filledTonalButtonColors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
                 contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-              )
+              ),
+              contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)
             ) {
               Icon(
                 imageVector = Icons.Default.Add,
                 contentDescription = null,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(22.dp)
               )
               Spacer(modifier = Modifier.width(6.dp))
               Text(
                 text = AppStrings.get(settings.language, "add_more_photos"),
                 fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
+                fontSize = 14.sp,
                 maxLines = 1,
-                softWrap = false
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
               )
             }
 
@@ -194,21 +198,23 @@ fun PreviewBuildScreen(
               border = if (settings.highContrastMode) BorderStroke(2.dp, MaterialTheme.colorScheme.outline) else null,
               modifier = Modifier
                 .weight(1f)
-                .height(58.dp)
-                .testTag("generate_pdf_button")
+                .defaultMinSize(minHeight = 52.dp)
+                .wrapContentHeight()
+                .testTag("generate_pdf_button"),
+              contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
             ) {
               Icon(
                 imageVector = Icons.Default.PictureAsPdf,
                 contentDescription = null,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(22.dp)
               )
               Spacer(modifier = Modifier.width(8.dp))
               Text(
                 text = AppStrings.get(settings.language, "create_pdf_button"),
                 fontWeight = FontWeight.Bold,
-                fontSize = if (settings.highContrastMode) 17.sp else 15.sp,
+                fontSize = if (settings.highContrastMode) 16.sp else 15.sp,
                 maxLines = 1,
-                softWrap = false
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
               )
             }
           }

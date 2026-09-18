@@ -9,11 +9,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -44,6 +46,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -90,7 +93,8 @@ fun ElderActionButton(
     onClick = onClick,
     modifier = modifier
       .fillMaxWidth()
-      .height(68.dp)
+      .defaultMinSize(minHeight = 56.dp)
+      .wrapContentHeight()
       .testTag(testTag),
     shape = RoundedCornerShape(18.dp),
     colors = ButtonDefaults.buttonColors(
@@ -98,25 +102,28 @@ fun ElderActionButton(
       contentColor = contentColor
     ),
     border = borderStroke,
-    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp)
+    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)
   ) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.Center
+      horizontalArrangement = Arrangement.Center,
+      modifier = Modifier.fillMaxWidth()
     ) {
       if (icon != null) {
         Icon(
           imageVector = icon,
           contentDescription = null,
-          modifier = Modifier.size(30.dp)
+          modifier = Modifier.size(28.dp)
         )
-        Spacer(modifier = Modifier.width(14.dp))
+        Spacer(modifier = Modifier.width(12.dp))
       }
       Text(
         text = text,
-        fontSize = if (isHighContrast) 22.sp else 20.sp,
+        fontSize = if (isHighContrast) 20.sp else 18.sp,
         fontWeight = FontWeight.Bold,
-        textAlign = TextAlign.Center
+        textAlign = TextAlign.Center,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis
       )
     }
   }

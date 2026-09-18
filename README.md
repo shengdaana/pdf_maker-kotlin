@@ -13,12 +13,12 @@ gallery select photos click share select pdf_maker app and hit generate pdf.
 
 > Making PDFs as easy as sharing photos on WhatsApp.
 ## Features
-- YOu CAN SAHRE IMAGES FROM GALLERY TO PDF_maker app it opens a preview screem
-- heree you can crop, rotate, move images up or down or merge them and there is toggle to hide this buttons in settings if you want
-- Simple, minimal interface, easy sharing and renaming and saving no confusion.
+- Share images directly from your gallery to the PDF Maker app to open the preview screen
+- Crop, rotate, reorder (move up/down), or merge images with simple toggles in settings
+- Simple, minimal interface, easy sharing, renaming, and saving without confusion
 - Designed with accessibility and ease of use in mind
 - No ads
-- works offline
+- Works completely offline
 
 ## Screenshots
 

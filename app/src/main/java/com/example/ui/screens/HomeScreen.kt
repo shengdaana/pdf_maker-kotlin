@@ -152,7 +152,7 @@ fun HomeScreen(
         .padding(horizontal = 24.dp),
       horizontalAlignment = Alignment.CenterHorizontally
     ) {
-      Spacer(modifier = Modifier.height(28.dp))
+      Spacer(modifier = Modifier.height(16.dp))
 
       // Friendly hero banner
       Surface(
