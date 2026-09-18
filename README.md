@@ -2,6 +2,15 @@
 
 A simple Android app for making PDFs from images.(made with the help of ai studios , and lots of other ai bots, lots of them)
 
+## How to use ?
+
+### After showing this app to my parents I learned few things 
+- You must teach  this app to your parents or whoever you are downloading this app it barely takes 5 minutes .
+- Best route is to through gallery -- select images -- click share -- pdf maker app -- hit generate pdf button -- share button. relate it with whatsapp
+- the app doesn't directly appear when you click on share photos it is present in 'more' since its new so you have to use it 3 - 4  times for it to start appearing.  teach them this too.
+- please in settings there is select quality please set it to  standard quality its confusing for some people to select from standard quality and high quality when you click generate.
+- there is toggle for the arrows that move pages up and down you can disable it too . merge photos is already disabled from default.
+
 ## Why?
 
 Many PDF apps make a simple task complicated with ads, filters,
