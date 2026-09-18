@@ -1,15 +1,20 @@
-name: Build Android APK
+name: Build and Release Android APK
 
 on:
   push:
     branches: [ main, master ]
+    tags:
+      - 'v*'
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  build-apk:
-    name: Build Native Android APK
+  build:
+    name: Build & Sign APK v1.0.0
     runs-on: ubuntu-latest
 
     steps:
@@ -31,21 +36,31 @@ jobs:
             yes | sdkmanager --licenses || true
           fi
 
-      - name: Prepare Environment and Keystore
+      - name: Prepare Environment and Secrets
         run: |
-          # Ensure .env exists for Secrets Gradle Plugin
+          # Prepare .env for build process
           if [ -f .env.example ]; then
             cp .env.example .env
           else
             touch .env
           fi
 
-          # Decode or generate debug.keystore
+          # Decode Release Keystore from GitHub Secrets
+          if [ -n "$KEYSTORE_BASE64_SECRET" ]; then
+            echo "$KEYSTORE_BASE64_SECRET" | base64 -d > release.keystore
+            echo "Successfully decoded release keystore."
+          else
+            echo "KEYSTORE_BASE64 secret not found, falling back to debug keystore."
+          fi
+
+          # Prepare debug keystore
           if [ -f debug.keystore.base64 ]; then
             base64 -d debug.keystore.base64 > debug.keystore
           elif [ ! -f debug.keystore ]; then
             keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
+        env:
+          KEYSTORE_BASE64_SECRET: ${{ secrets.KEYSTORE_BASE64 }}
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -53,14 +68,49 @@ jobs:
       - name: Grant Execute Permission to Gradlew
         run: chmod +x ./gradlew
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+      - name: Build Signed Release APK
+        run: |
+          if [ -f release.keystore ]; then
+            echo "Building Release APK with signing secrets..."
+            ./gradlew assembleRelease --no-daemon --stacktrace
+          else
+            echo "Building Debug APK..."
+            ./gradlew assembleDebug --no-daemon --stacktrace
+          fi
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/release.keystore
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
 
-      - name: Upload Debug APK Artifact
+      - name: Prepare Release Artifacts (v1.0.0)
+        run: |
+          mkdir -p build-artifacts
+          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+            cp app/build/outputs/apk/release/app-release.apk build-artifacts/pdf-maker-v1.0.0.apk
+          elif [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
+            cp app/build/outputs/apk/debug/app-debug.apk build-artifacts/pdf-maker-v1.0.0-debug.apk
+          fi
+
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pdf_maker_debug_apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: pdf-maker-v1.0.0-apk
+          path: build-artifacts/*.apk
           if-no-files-found: error
           retention-days: 30
 
+      - name: Create GitHub Release (on Tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build-artifacts/*.apk
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
