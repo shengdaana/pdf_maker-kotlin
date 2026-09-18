@@ -3,10 +3,20 @@ name: Build and Release Android APK
 on:
   push:
     branches: [ main, master ]
+    paths-ignore:
+      - 'LICENSE'
+      - 'README.md'
+      - '**.md'
+      - '.gitignore'
     tags:
       - 'v*'
   pull_request:
     branches: [ main, master ]
+    paths-ignore:
+      - 'LICENSE'
+      - 'README.md'
+      - '**.md'
+      - '.gitignore'
   workflow_dispatch:
 
 permissions:
