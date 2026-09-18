@@ -154,7 +154,7 @@ fun HiddenSettingsScreen(
       SettingsCard(
         title = "1. " + AppStrings.get(currentSettings.language, "theme_title"),
         icon = Icons.Default.ColorLens,
-        subtitle = "Choose from 5 modern color styles"
+        subtitle = "Choose from modern color styles & dark mode"
       ) {
         SettingsDropdownSelector(
           label = AppStrings.get(currentSettings.language, "theme_title"),
@@ -164,6 +164,7 @@ fun HiddenSettingsScreen(
           leadingContent = { theme ->
             val colorPreview = when (theme) {
               AppTheme.PURPLE -> PurplePrimary
+              AppTheme.DARK -> Color(0xFF1E293B)
               AppTheme.LIGHT_GREEN -> GreenPrimary
               AppTheme.PINK -> PinkPrimary
               AppTheme.COBALT_BLUE -> CobaltPrimary
@@ -225,41 +226,9 @@ fun HiddenSettingsScreen(
         )
       }
 
-      // 4. AUTO-CROP ON IMPORT (WITH SAFETY BUFFER MARGIN)
+      // 4. DEFAULT PDF QUALITY PRESET (DROPDOWN)
       SettingsCard(
-        title = "4. " + AppStrings.get(currentSettings.language, "auto_crop_title"),
-        icon = Icons.Default.AutoFixHigh,
-        subtitle = AppStrings.get(currentSettings.language, "auto_crop_desc")
-      ) {
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.SpaceBetween,
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          Column(modifier = Modifier.weight(1f)) {
-            Text(
-              text = "Trim Scanner/Table Shadows",
-              style = MaterialTheme.typography.bodyMedium,
-              fontWeight = FontWeight.SemiBold
-            )
-            Text(
-              text = "Retains safety buffer margin so document text is never cut off",
-              style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-          }
-          Switch(
-            checked = currentSettings.autoCropOnImport,
-            onCheckedChange = { checked ->
-              onUpdateSettings(currentSettings.copy(autoCropOnImport = checked))
-            }
-          )
-        }
-      }
-
-      // 5. DEFAULT PDF QUALITY PRESET (DROPDOWN)
-      SettingsCard(
-        title = "5. " + AppStrings.get(currentSettings.language, "compression_title"),
+        title = "4. " + AppStrings.get(currentSettings.language, "compression_title"),
         icon = Icons.Default.Compress,
         subtitle = "Standard Quality downsamples to ~1920px for light PDF weight"
       ) {
@@ -283,9 +252,9 @@ fun HiddenSettingsScreen(
         )
       }
 
-      // 6. SIMPLIFIED MODE & PAGE CONTROLS (WITH MERGE PAGES TOGGLE)
+      // 5. SIMPLIFIED MODE & PAGE CONTROLS (WITH MERGE PAGES TOGGLE)
       SettingsCard(
-        title = "6. Simplified Mode & Controls",
+        title = "5. Simplified Mode & Controls",
         icon = Icons.Default.SwapVert,
         subtitle = "Configure page controls and preview layout"
       ) {
@@ -345,9 +314,9 @@ fun HiddenSettingsScreen(
         }
       }
 
-      // 7. DEFAULT SAVE LOCATION PATH
+      // 6. DEFAULT SAVE LOCATION PATH
       SettingsCard(
-        title = "7. " + AppStrings.get(currentSettings.language, "save_folder_title"),
+        title = "6. " + AppStrings.get(currentSettings.language, "save_folder_title"),
         icon = Icons.Default.Folder,
         subtitle = "Target output folder in device Documents"
       ) {

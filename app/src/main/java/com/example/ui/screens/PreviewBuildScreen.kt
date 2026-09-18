@@ -177,7 +177,9 @@ fun PreviewBuildScreen(
               Text(
                 text = AppStrings.get(settings.language, "add_more_photos"),
                 fontWeight = FontWeight.Bold,
-                fontSize = 15.sp
+                fontSize = 15.sp,
+                maxLines = 1,
+                softWrap = false
               )
             }
 
@@ -204,7 +206,9 @@ fun PreviewBuildScreen(
               Text(
                 text = AppStrings.get(settings.language, "create_pdf_button"),
                 fontWeight = FontWeight.Bold,
-                fontSize = if (settings.highContrastMode) 18.sp else 16.sp
+                fontSize = if (settings.highContrastMode) 17.sp else 15.sp,
+                maxLines = 1,
+                softWrap = false
               )
             }
           }
@@ -325,6 +329,8 @@ fun PageCardItem(
               style = MaterialTheme.typography.labelMedium,
               fontWeight = FontWeight.Bold,
               color = Color.White,
+              maxLines = 1,
+              softWrap = false,
               modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
             )
           }
@@ -349,7 +355,9 @@ fun PageCardItem(
                   text = AppStrings.get(language, "merged_badge"),
                   style = MaterialTheme.typography.labelSmall,
                   fontWeight = FontWeight.Bold,
-                  color = MaterialTheme.colorScheme.onTertiaryContainer
+                  color = MaterialTheme.colorScheme.onTertiaryContainer,
+                  maxLines = 1,
+                  softWrap = false
                 )
               }
             }
@@ -371,7 +379,9 @@ fun PageCardItem(
               Text(
                 text = AppStrings.get(language, "unmerge_page_btn"),
                 style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                softWrap = false
               )
             }
             Spacer(modifier = Modifier.width(4.dp))
@@ -398,7 +408,9 @@ fun PageCardItem(
                 text = "Crop / Rotate",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                softWrap = false
               )
             }
           }

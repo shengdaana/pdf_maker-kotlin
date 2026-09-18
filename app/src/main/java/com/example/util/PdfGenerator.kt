@@ -69,13 +69,11 @@ object PdfGenerator {
         )
 
         if (rawBitmap != null) {
-          val autoTrim = pageItem.autoTrimApplied || settings.autoCropOnImport
           val processed = ImageUtils.processBitmap(
             rawBitmap,
             pageItem.rotationDegrees,
             pageItem.cropRect,
-            pageItem.cropAspectRatio,
-            autoTrim
+            pageItem.cropAspectRatio
           )
 
           // Downsample and compress to JPEG if standard quality to reduce PDF weight significantly
@@ -280,6 +278,25 @@ object PdfGenerator {
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
       }
       context.startActivity(Intent.createChooser(intent, "Share PDF via..."))
+    } catch (_: Exception) {
+    }
+  }
+
+  fun batchSharePdfs(context: Context, pdfs: List<GeneratedPdf>) {
+    if (pdfs.isEmpty()) return
+    if (pdfs.size == 1) {
+      sharePdf(context, pdfs.first())
+      return
+    }
+    try {
+      val uriList = ArrayList<Uri>(pdfs.map { it.uri })
+      val intent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+        type = "application/pdf"
+        putParcelableArrayListExtra(Intent.EXTRA_STREAM, uriList)
+        putExtra(Intent.EXTRA_SUBJECT, "${pdfs.size} PDFs from pdf_maker")
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+      }
+      context.startActivity(Intent.createChooser(intent, "Share ${pdfs.size} PDFs via..."))
     } catch (_: Exception) {
     }
   }

@@ -26,7 +26,6 @@ data class ImagePage(
   val rotationDegrees: Int = 0, // 0, 90, 180, 270
   val cropRect: CropRect? = null, // manual free crop area
   val cropAspectRatio: Float? = null, // null for original, or width/height ratio like 1f (square), 0.707f (A4 portrait)
-  val autoTrimApplied: Boolean = false,
   val isMerged: Boolean = false,
   val originalPages: List<ImagePage>? = null,
   val customBitmapCacheKey: Long = System.currentTimeMillis()
@@ -79,6 +78,7 @@ typealias PageMarginOption = PageLayoutMode
  */
 enum class AppTheme(val displayName: String) {
   PURPLE("Purple"),
+  DARK("Dark Mode"),
   LIGHT_GREEN("Light Green"),
   PINK("Pink"),
   COBALT_BLUE("Cobalt Blue"),
@@ -104,7 +104,6 @@ data class DeveloperSettings(
   val defaultQuality: PdfQuality = PdfQuality.ALWAYS_ASK,
   val pageLayoutMode: PageLayoutMode = PageLayoutMode.FREE_DYNAMIC,
   val pageMargin: PageMarginOption = PageLayoutMode.FREE_DYNAMIC,
-  val autoCropOnImport: Boolean = false,
   val simplifiedMode: Boolean = false, // Hides reorder arrows for elder simplicity
   val enableMergePages: Boolean = false, // Toggle for merge pages in simplified mode tab (default its off)
   val defaultSavePath: String = "PDF documents(pdf_maker)",

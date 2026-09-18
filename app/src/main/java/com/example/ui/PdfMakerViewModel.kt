@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.model.AppScreen
+import com.example.model.AppTheme
 import com.example.model.CropRect
 import com.example.model.DeveloperSettings
 import com.example.model.GeneratedPdf
@@ -74,12 +75,10 @@ class PdfMakerViewModel(application: Application) : AndroidViewModel(application
   fun addImages(uris: List<Uri>) {
     if (uris.isEmpty()) return
     val currentList = _pages.value.toMutableList()
-    val autoTrimDefault = settings.value.autoCropOnImport
     uris.forEach { uri ->
       currentList.add(
         ImagePage(
-          uri = uri,
-          autoTrimApplied = autoTrimDefault
+          uri = uri
         )
       )
     }
@@ -122,8 +121,7 @@ class PdfMakerViewModel(application: Application) : AndroidViewModel(application
     pageId: String,
     rotationDegrees: Int,
     cropRect: CropRect?,
-    cropAspectRatio: Float?,
-    autoTrim: Boolean
+    cropAspectRatio: Float?
   ) {
     val list = _pages.value.map { page ->
       if (page.id == pageId) {
@@ -131,7 +129,6 @@ class PdfMakerViewModel(application: Application) : AndroidViewModel(application
           rotationDegrees = rotationDegrees,
           cropRect = cropRect,
           cropAspectRatio = cropAspectRatio,
-          autoTrimApplied = autoTrim,
           customBitmapCacheKey = System.currentTimeMillis()
         )
       } else {
@@ -264,6 +261,22 @@ class PdfMakerViewModel(application: Application) : AndroidViewModel(application
     if (pdf != null) {
       PdfGenerator.sharePdf(context, pdf)
     }
+  }
+
+  fun batchSharePdfs(context: Context, pdfs: List<GeneratedPdf>) {
+    if (pdfs.isNotEmpty()) {
+      PdfGenerator.batchSharePdfs(context, pdfs)
+    }
+  }
+
+  fun toggleDarkMode() {
+    val current = settings.value
+    val newTheme = if (current.theme == AppTheme.DARK || current.theme == AppTheme.HIGH_CONTRAST_DARK) {
+      AppTheme.PURPLE
+    } else {
+      AppTheme.DARK
+    }
+    updateSettings(current.copy(theme = newTheme))
   }
 
   fun openPdf(context: Context, pdf: GeneratedPdf? = _lastGeneratedPdf.value) {

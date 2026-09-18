@@ -22,7 +22,6 @@ class SettingsManager(context: Context) {
     prefs.edit().apply {
       putString(KEY_DEFAULT_QUALITY, newSettings.defaultQuality.name)
       putString(KEY_PAGE_LAYOUT, newSettings.pageLayoutMode.name)
-      putBoolean(KEY_AUTO_CROP, newSettings.autoCropOnImport)
       putBoolean(KEY_SIMPLIFIED_MODE, newSettings.simplifiedMode)
       putBoolean(KEY_ENABLE_MERGE_PAGES, newSettings.enableMergePages)
       putString(KEY_SAVE_PATH, newSettings.defaultSavePath)
@@ -62,7 +61,6 @@ class SettingsManager(context: Context) {
       AppLanguage.ENGLISH
     }
 
-    val autoCrop = prefs.getBoolean(KEY_AUTO_CROP, false)
     val simplified = prefs.getBoolean(KEY_SIMPLIFIED_MODE, false)
     val enableMerge = prefs.getBoolean(KEY_ENABLE_MERGE_PAGES, false)
     val savePath = prefs.getString(KEY_SAVE_PATH, DEFAULT_SAVE_FOLDER) ?: DEFAULT_SAVE_FOLDER
@@ -71,7 +69,6 @@ class SettingsManager(context: Context) {
       defaultQuality = quality,
       pageLayoutMode = layout,
       pageMargin = layout,
-      autoCropOnImport = autoCrop,
       simplifiedMode = simplified,
       enableMergePages = enableMerge,
       defaultSavePath = savePath,
@@ -84,7 +81,6 @@ class SettingsManager(context: Context) {
     private const val PREFS_NAME = "pdf_maker_prefs"
     private const val KEY_DEFAULT_QUALITY = "pref_default_quality"
     private const val KEY_PAGE_LAYOUT = "pref_page_layout"
-    private const val KEY_AUTO_CROP = "pref_auto_crop"
     private const val KEY_SIMPLIFIED_MODE = "pref_simplified_mode"
     private const val KEY_ENABLE_MERGE_PAGES = "pref_enable_merge_pages"
     private const val KEY_SAVE_PATH = "pref_save_path"

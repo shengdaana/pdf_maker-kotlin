@@ -9,21 +9,39 @@ import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Rect
 import android.net.Uri
+import androidx.exifinterface.media.ExifInterface
 import com.example.model.CropRect
 import com.example.model.ImagePage
 import java.io.File
 import java.io.FileOutputStream
-import java.io.InputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlin.math.max
-import kotlin.math.min
 
 object ImageUtils {
 
   /**
-   * Decodes a bitmap from a content Uri with bounds check to prevent OOM.
-   * Target bounds accommodate standard ~1800-2048px or original high-res ~3500px.
+   * Reads EXIF orientation from the image Uri.
+   */
+  fun getExifOrientation(context: Context, uri: Uri): Int {
+    return try {
+      if (uri.scheme == "file" && uri.path != null) {
+        val exif = ExifInterface(uri.path!!)
+        exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+      } else {
+        context.contentResolver.openInputStream(uri)?.use { stream ->
+          val exif = ExifInterface(stream)
+          exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+        } ?: ExifInterface.ORIENTATION_NORMAL
+      }
+    } catch (_: Exception) {
+      ExifInterface.ORIENTATION_NORMAL
+    }
+  }
+
+  /**
+   * Decodes a bitmap from a content Uri with bounds check to prevent OOM,
+   * AND immediately applies EXIF orientation normalization so the decoded bitmap
+   * is guaranteed to be 0° upright visual orientation before any further processing.
    */
   fun decodeSampledBitmapFromUri(
     context: Context,
@@ -32,6 +50,12 @@ object ImageUtils {
     reqHeight: Int
   ): Bitmap? {
     return try {
+      val orientation = getExifOrientation(context, uri)
+      val isRotated90or270 = orientation == ExifInterface.ORIENTATION_ROTATE_90 ||
+        orientation == ExifInterface.ORIENTATION_ROTATE_270 ||
+        orientation == ExifInterface.ORIENTATION_TRANSPOSE ||
+        orientation == ExifInterface.ORIENTATION_TRANSVERSE
+
       val options = BitmapFactory.Options().apply {
         inJustDecodeBounds = true
       }
@@ -39,12 +63,40 @@ object ImageUtils {
         BitmapFactory.decodeStream(stream, null, options)
       }
 
-      options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight)
+      options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight, isRotated90or270)
       options.inJustDecodeBounds = false
       options.inPreferredConfig = Bitmap.Config.ARGB_8888
 
-      context.contentResolver.openInputStream(uri)?.use { stream ->
+      val decoded = context.contentResolver.openInputStream(uri)?.use { stream ->
         BitmapFactory.decodeStream(stream, null, options)
+      } ?: return null
+
+      // Normalize EXIF orientation to ensure 0° visual upright orientation
+      val matrix = Matrix()
+      when (orientation) {
+        ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+        ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+        ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+        ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
+        ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.postScale(1f, -1f)
+        ExifInterface.ORIENTATION_TRANSPOSE -> {
+          matrix.postRotate(90f)
+          matrix.postScale(-1f, 1f)
+        }
+        ExifInterface.ORIENTATION_TRANSVERSE -> {
+          matrix.postRotate(270f)
+          matrix.postScale(-1f, 1f)
+        }
+      }
+
+      if (!matrix.isIdentity) {
+        val normalized = Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
+        if (normalized != decoded) {
+          decoded.recycle()
+        }
+        normalized
+      } else {
+        decoded
       }
     } catch (_: Exception) {
       null
@@ -54,9 +106,13 @@ object ImageUtils {
   private fun calculateInSampleSize(
     options: BitmapFactory.Options,
     reqWidth: Int,
-    reqHeight: Int
+    reqHeight: Int,
+    isSwapped: Boolean = false
   ): Int {
-    val (height: Int, width: Int) = options.outHeight to options.outWidth
+    val rawH = options.outHeight
+    val rawW = options.outWidth
+    val height = if (isSwapped) rawW else rawH
+    val width = if (isSwapped) rawH else rawW
     var inSampleSize = 1
 
     if (height > reqHeight || width > reqWidth) {
@@ -72,7 +128,6 @@ object ImageUtils {
 
   /**
    * Downsamples a bitmap to a maximum bounding box preserving aspect ratio.
-   * For Standard Quality: maxDimension ~1800-2040px.
    */
   fun downsampleBitmap(source: Bitmap, maxDimension: Int): Bitmap {
     val currentMax = maxOf(source.width, source.height)
@@ -86,18 +141,18 @@ object ImageUtils {
   }
 
   /**
-   * Applies user rotation, manual crop bounds, aspect ratio crop, and auto-trim if enabled.
+   * Applies user rotation, manual free crop bounds, and aspect ratio crop.
+   * Auto-crop has been completely removed to prioritize precise manual Free Crop.
    */
   fun processBitmap(
     source: Bitmap,
     rotationDegrees: Int,
     cropRect: CropRect?,
-    targetAspectRatio: Float?, // width / height
-    autoTrim: Boolean
+    targetAspectRatio: Float? = null
   ): Bitmap {
     var result = source
 
-    // 1. Apply user rotation if any
+    // 1. Apply user rotation if any (relative to already EXIF-normalized upright bitmap)
     if (rotationDegrees % 360 != 0) {
       val matrix = Matrix().apply { postRotate(rotationDegrees.toFloat()) }
       val rotated = Bitmap.createBitmap(
@@ -127,25 +182,14 @@ object ImageUtils {
       }
     }
 
-    // 3. Apply auto-trim with safety buffer margin if requested
-    if (autoTrim) {
-      val trimmed = autoTrimBitmapWithBuffer(result)
-      if (trimmed != result) {
-        if (result != source) result.recycle()
-        result = trimmed
-      }
-    }
-
-    // 4. Apply target aspect ratio crop if explicitly requested (e.g., A4 or 1:1)
+    // 3. Apply target aspect ratio crop if explicitly requested (e.g., A4 or 1:1)
     if (targetAspectRatio != null && targetAspectRatio > 0f) {
       val currentAspect = result.width.toFloat() / result.height.toFloat()
       val rect: Rect = if (currentAspect > targetAspectRatio) {
-        // Wider than desired -> trim left and right
         val newWidth = (result.height * targetAspectRatio).toInt().coerceAtMost(result.width)
         val xOffset = (result.width - newWidth) / 2
         Rect(xOffset, 0, xOffset + newWidth, result.height)
       } else {
-        // Taller than desired -> trim top and bottom
         val newHeight = (result.width / targetAspectRatio).toInt().coerceAtMost(result.height)
         val yOffset = (result.height - newHeight) / 2
         Rect(0, yOffset, result.width, yOffset + newHeight)
@@ -168,113 +212,7 @@ object ImageUtils {
   }
 
   /**
-   * Detects dark borders or scanner shadows around document photos and trims them,
-   * preserving a generous safety buffer margin (~4-6%) so document text and stamps are NEVER cut off.
-   */
-  private fun autoTrimBitmapWithBuffer(bitmap: Bitmap): Bitmap {
-    val width = bitmap.width
-    val height = bitmap.height
-    if (width < 60 || height < 60) return bitmap
-
-    val sampleStep = max(1, min(width, height) / 200)
-    var top = 0
-    var bottom = height - 1
-    var left = 0
-    var right = width - 1
-
-    val darkThreshold = 40 // Conservative threshold for dark shadow/background
-
-    // Scan top
-    topLoop@ for (y in 0 until (height / 5) step sampleStep) {
-      var darkCount = 0
-      var total = 0
-      for (x in 0 until width step sampleStep * 2) {
-        val pixel = bitmap.getPixel(x, y)
-        val lum = (Color.red(pixel) + Color.green(pixel) + Color.blue(pixel)) / 3
-        if (lum < darkThreshold) darkCount++
-        total++
-      }
-      if (total > 0 && (darkCount.toFloat() / total) > 0.65f) {
-        top = y + sampleStep
-      } else {
-        break@topLoop
-      }
-    }
-
-    // Scan bottom
-    bottomLoop@ for (y in height - 1 downTo (height * 4 / 5) step sampleStep) {
-      var darkCount = 0
-      var total = 0
-      for (x in 0 until width step sampleStep * 2) {
-        val pixel = bitmap.getPixel(x, y)
-        val lum = (Color.red(pixel) + Color.green(pixel) + Color.blue(pixel)) / 3
-        if (lum < darkThreshold) darkCount++
-        total++
-      }
-      if (total > 0 && (darkCount.toFloat() / total) > 0.65f) {
-        bottom = y - sampleStep
-      } else {
-        break@bottomLoop
-      }
-    }
-
-    // Scan left
-    leftLoop@ for (x in 0 until (width / 5) step sampleStep) {
-      var darkCount = 0
-      var total = 0
-      for (y in 0 until height step sampleStep * 2) {
-        val pixel = bitmap.getPixel(x, y)
-        val lum = (Color.red(pixel) + Color.green(pixel) + Color.blue(pixel)) / 3
-        if (lum < darkThreshold) darkCount++
-        total++
-      }
-      if (total > 0 && (darkCount.toFloat() / total) > 0.65f) {
-        left = x + sampleStep
-      } else {
-        break@leftLoop
-      }
-    }
-
-    // Scan right
-    rightLoop@ for (x in width - 1 downTo (width * 4 / 5) step sampleStep) {
-      var darkCount = 0
-      var total = 0
-      for (y in 0 until height step sampleStep * 2) {
-        val pixel = bitmap.getPixel(x, y)
-        val lum = (Color.red(pixel) + Color.green(pixel) + Color.blue(pixel)) / 3
-        if (lum < darkThreshold) darkCount++
-        total++
-      }
-      if (total > 0 && (darkCount.toFloat() / total) > 0.65f) {
-        right = x - sampleStep
-      } else {
-        break@rightLoop
-      }
-    }
-
-    // APPLY SAFETY BUFFER MARGIN: Expand outwards by 5% of dimensions to never clip document content
-    val hBuffer = (width * 0.05f).toInt()
-    val vBuffer = (height * 0.05f).toInt()
-
-    val safeLeft = (left - hBuffer).coerceAtLeast(0)
-    val safeTop = (top - vBuffer).coerceAtLeast(0)
-    val safeRight = (right + hBuffer).coerceAtMost(width - 1)
-    val safeBottom = (bottom + vBuffer).coerceAtMost(height - 1)
-
-    val trimmedWidth = safeRight - safeLeft + 1
-    val trimmedHeight = safeBottom - safeTop + 1
-
-    if (trimmedWidth > width * 0.75f && trimmedHeight > height * 0.75f &&
-      (safeLeft > 0 || safeTop > 0 || safeRight < width - 1 || safeBottom < height - 1)
-    ) {
-      return Bitmap.createBitmap(bitmap, safeLeft, safeTop, trimmedWidth, trimmedHeight)
-    }
-
-    return bitmap
-  }
-
-  /**
-   * Helper to decode and apply transforms (rotation, crop, auto-trim) to an ImagePage.
+   * Helper to decode and apply transforms (EXIF normalization, user rotation, manual crop) to an ImagePage.
    */
   fun getProcessedPageBitmap(
     context: Context,
@@ -287,8 +225,7 @@ object ImageUtils {
       source = decoded,
       rotationDegrees = page.rotationDegrees,
       cropRect = page.cropRect,
-      targetAspectRatio = page.cropAspectRatio,
-      autoTrim = page.autoTrimApplied
+      targetAspectRatio = page.cropAspectRatio
     )
   }
 
@@ -340,7 +277,7 @@ object ImageUtils {
       val dir = File(context.cacheDir, "merged_pages").apply { mkdirs() }
       val file = File(dir, "merged_${System.currentTimeMillis()}.jpg")
       FileOutputStream(file).use { out ->
-        combinedBitmap.compress(Bitmap.CompressFormat.JPEG, 88, out)
+        combinedBitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
       }
 
       bmp1.recycle()

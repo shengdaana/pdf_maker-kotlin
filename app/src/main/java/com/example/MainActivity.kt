@@ -102,7 +102,8 @@ class MainActivity : ComponentActivity() {
                   },
                   onOpenSettings = { viewModel.navigateTo(AppScreen.HiddenSettings) },
                   onOpenPdf = { pdf -> viewModel.openPdf(context, pdf) },
-                  onSharePdf = { pdf -> viewModel.sharePdf(context, pdf) }
+                  onSharePdf = { pdf -> viewModel.sharePdf(context, pdf) },
+                  onToggleDarkMode = { viewModel.toggleDarkMode() }
                 )
               }
 
@@ -137,13 +138,12 @@ class MainActivity : ComponentActivity() {
                   CropEditorScreen(
                     page = editingPage,
                     language = currentSettings.language,
-                    onSave = { rotation, cropRect, cropRatio, autoTrim ->
+                    onSave = { rotation, cropRect, cropRatio ->
                       viewModel.updatePageCrop(
                         pageId = editingPage.id,
                         rotationDegrees = rotation,
                         cropRect = cropRect,
-                        cropAspectRatio = cropRatio,
-                        autoTrim = autoTrim
+                        cropAspectRatio = cropRatio
                       )
                       viewModel.navigateTo(AppScreen.PreviewBuild)
                     },
@@ -198,6 +198,7 @@ class MainActivity : ComponentActivity() {
                   settings = currentSettings,
                   onOpenPdf = { pdf -> viewModel.openPdf(context, pdf) },
                   onSharePdf = { pdf -> viewModel.sharePdf(context, pdf) },
+                  onBatchSharePdfs = { pdfList -> viewModel.batchSharePdfs(context, pdfList) },
                   onRenamePdf = { pdf, newName -> viewModel.renamePdf(pdf, newName) },
                   onDeletePdf = { pdf -> viewModel.deletePdf(pdf) },
                   onBackPressed = { viewModel.navigateTo(AppScreen.Home) },

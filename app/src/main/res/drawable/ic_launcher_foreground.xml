@@ -3,7 +3,7 @@
     <item
         android:width="66dp"
         android:height="66dp"
-        android:drawable="@drawable/ic_launcher_foreground_1789632411938"
+        android:drawable="@drawable/modern_pdf_icon_1789707771038"
         android:gravity="center" />
 </layer-list>
 

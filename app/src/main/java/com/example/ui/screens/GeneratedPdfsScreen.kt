@@ -1,8 +1,10 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,10 +24,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
@@ -33,6 +39,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -73,6 +80,7 @@ fun GeneratedPdfsScreen(
   settings: DeveloperSettings,
   onOpenPdf: (GeneratedPdf) -> Unit,
   onSharePdf: (GeneratedPdf) -> Unit,
+  onBatchSharePdfs: (List<GeneratedPdf>) -> Unit,
   onRenamePdf: (GeneratedPdf, String) -> Unit,
   onDeletePdf: (GeneratedPdf) -> Unit,
   onBackPressed: () -> Unit,
@@ -80,41 +88,144 @@ fun GeneratedPdfsScreen(
 ) {
   var pdfToRename by remember { mutableStateOf<GeneratedPdf?>(null) }
   var pdfToDelete by remember { mutableStateOf<GeneratedPdf?>(null) }
+  var isSelectionMode by remember { mutableStateOf(false) }
+  var selectedPdfPaths by remember { mutableStateOf(setOf<String>()) }
+
+  val selectedPdfs = pdfs.filter { it.file.absolutePath in selectedPdfPaths }
 
   Scaffold(
     topBar = {
       TopAppBar(
         title = {
-          Column {
+          if (isSelectionMode) {
             Text(
-              text = "Generated PDFs",
+              text = "${selectedPdfPaths.size} of ${pdfs.size} Selected",
               fontWeight = FontWeight.Bold,
-              fontSize = if (settings.highContrastMode) 22.sp else 19.sp
+              fontSize = 18.sp
             )
-            Text(
-              text = "${pdfs.size} ${if (pdfs.size == 1) "document" else "documents"} in Documents/${settings.defaultSavePath}",
-              style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-              maxLines = 1,
-              overflow = TextOverflow.Ellipsis
-            )
+          } else {
+            Column {
+              Text(
+                text = "Generated PDFs",
+                fontWeight = FontWeight.Bold,
+                fontSize = if (settings.highContrastMode) 22.sp else 19.sp
+              )
+              Text(
+                text = "${pdfs.size} ${if (pdfs.size == 1) "document" else "documents"} in Documents/${settings.defaultSavePath}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+              )
+            }
           }
         },
         navigationIcon = {
-          IconButton(
-            onClick = onBackPressed,
-            modifier = Modifier.testTag("back_from_generated_pdfs")
-          ) {
-            Icon(
-              imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-              contentDescription = "Back"
-            )
+          if (isSelectionMode) {
+            IconButton(
+              onClick = {
+                isSelectionMode = false
+                selectedPdfPaths = emptySet()
+              },
+              modifier = Modifier.testTag("close_selection_mode_button")
+            ) {
+              Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "Cancel selection"
+              )
+            }
+          } else {
+            IconButton(
+              onClick = onBackPressed,
+              modifier = Modifier.testTag("back_from_generated_pdfs")
+            ) {
+              Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back"
+              )
+            }
+          }
+        },
+        actions = {
+          if (pdfs.isNotEmpty()) {
+            if (isSelectionMode) {
+              TextButton(
+                onClick = {
+                  selectedPdfPaths = if (selectedPdfPaths.size == pdfs.size) {
+                    emptySet()
+                  } else {
+                    pdfs.map { it.file.absolutePath }.toSet()
+                  }
+                },
+                modifier = Modifier.testTag("select_all_toggle_button")
+              ) {
+                Text(
+                  text = if (selectedPdfPaths.size == pdfs.size) "Deselect All" else "Select All",
+                  fontWeight = FontWeight.Bold
+                )
+              }
+            } else {
+              IconButton(
+                onClick = {
+                  isSelectionMode = true
+                  selectedPdfPaths = emptySet()
+                },
+                modifier = Modifier.testTag("start_batch_select_button")
+              ) {
+                Icon(
+                  imageVector = Icons.Default.Checklist,
+                  contentDescription = "Batch Select & Share",
+                  tint = MaterialTheme.colorScheme.primary
+                )
+              }
+            }
           }
         },
         colors = TopAppBarDefaults.topAppBarColors(
           containerColor = MaterialTheme.colorScheme.background
         )
       )
+    },
+    bottomBar = {
+      if (isSelectionMode && selectedPdfPaths.isNotEmpty()) {
+        Surface(
+          shadowElevation = 8.dp,
+          color = MaterialTheme.colorScheme.surface,
+          modifier = Modifier.fillMaxWidth()
+        ) {
+          Row(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            Button(
+              onClick = {
+                onBatchSharePdfs(selectedPdfs)
+              },
+              shape = RoundedCornerShape(12.dp),
+              modifier = Modifier
+                .weight(1f)
+                .height(48.dp)
+                .testTag("batch_share_confirm_button")
+            ) {
+              Icon(
+                imageVector = Icons.Default.Share,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+              )
+              Spacer(modifier = Modifier.width(8.dp))
+              Text(
+                text = "Batch Share (${selectedPdfPaths.size})",
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                maxLines = 1
+              )
+            }
+          }
+        }
+      }
     },
     containerColor = MaterialTheme.colorScheme.background
   ) { innerPadding ->
@@ -193,13 +304,36 @@ fun GeneratedPdfsScreen(
           .padding(innerPadding)
           .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
-        contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp)
+        contentPadding = PaddingValues(top = 12.dp, bottom = if (isSelectionMode) 80.dp else 24.dp)
       ) {
         items(pdfs, key = { it.file.absolutePath }) { pdf ->
+          val isSelected = pdf.file.absolutePath in selectedPdfPaths
+
           GeneratedPdfCard(
             pdf = pdf,
             highContrast = settings.highContrastMode,
-            onOpen = { onOpenPdf(pdf) },
+            isSelectionMode = isSelectionMode,
+            isSelected = isSelected,
+            onToggleSelect = {
+              val current = selectedPdfPaths.toMutableSet()
+              if (isSelected) current.remove(pdf.file.absolutePath) else current.add(pdf.file.absolutePath)
+              selectedPdfPaths = current
+            },
+            onLongClick = {
+              if (!isSelectionMode) {
+                isSelectionMode = true
+                selectedPdfPaths = setOf(pdf.file.absolutePath)
+              }
+            },
+            onOpen = {
+              if (isSelectionMode) {
+                val current = selectedPdfPaths.toMutableSet()
+                if (isSelected) current.remove(pdf.file.absolutePath) else current.add(pdf.file.absolutePath)
+                selectedPdfPaths = current
+              } else {
+                onOpenPdf(pdf)
+              }
+            },
             onShare = { onSharePdf(pdf) },
             onRename = { pdfToRename = pdf },
             onDelete = { pdfToDelete = pdf }
@@ -310,10 +444,15 @@ fun GeneratedPdfsScreen(
   }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun GeneratedPdfCard(
   pdf: GeneratedPdf,
   highContrast: Boolean,
+  isSelectionMode: Boolean = false,
+  isSelected: Boolean = false,
+  onToggleSelect: () -> Unit = {},
+  onLongClick: () -> Unit = {},
   onOpen: () -> Unit,
   onShare: () -> Unit,
   onRename: () -> Unit,
@@ -327,23 +466,44 @@ fun GeneratedPdfCard(
     "${(pdf.sizeBytes / 1024).coerceAtLeast(1)} KB"
   }
 
+  val borderStroke = when {
+    isSelected -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+    highContrast -> BorderStroke(2.dp, Color.Black)
+    else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+  }
+
   Card(
     shape = RoundedCornerShape(18.dp),
-    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-    border = if (highContrast) BorderStroke(2.dp, Color.Black) else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+    colors = CardDefaults.cardColors(
+      containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surface
+    ),
+    elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 4.dp else 2.dp),
+    border = borderStroke,
     modifier = Modifier
       .fillMaxWidth()
       .testTag("generated_pdf_card_${pdf.fileName}")
   ) {
-    Column(modifier = Modifier.padding(16.dp)) {
-      // Header: PDF Icon + Name + Date
+    Column(
+      modifier = Modifier
+        .combinedClickable(
+          onClick = onOpen,
+          onLongClick = onLongClick
+        )
+        .padding(16.dp)
+    ) {
+      // Header: PDF Icon + Name + Date + (Checkbox in selection mode)
       Row(
-        modifier = Modifier
-          .fillMaxWidth()
-          .clickable(onClick = onOpen),
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
       ) {
+        if (isSelectionMode) {
+          Checkbox(
+            checked = isSelected,
+            onCheckedChange = { onToggleSelect() },
+            modifier = Modifier.padding(end = 6.dp)
+          )
+        }
+
         Box(
           modifier = Modifier
             .size(48.dp)
@@ -381,92 +541,95 @@ fun GeneratedPdfCard(
         }
       }
 
-      Spacer(modifier = Modifier.height(14.dp))
+      if (!isSelectionMode) {
+        Spacer(modifier = Modifier.height(14.dp))
 
-      // Action row: Open/View, Share, Rename, Delete
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-      ) {
-        // Open Button
-        Button(
-          onClick = onOpen,
-          shape = RoundedCornerShape(10.dp),
-          colors = ButtonDefaults.buttonColors(
-            containerColor = if (highContrast) Color.Black else MaterialTheme.colorScheme.primary
-          ),
-          modifier = Modifier
-            .weight(1f)
-            .height(42.dp)
-            .testTag("open_pdf_${pdf.fileName}")
+        // Action row: Open/View, Share, Rename, Delete
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-          Icon(
-            imageVector = Icons.Default.Visibility,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp)
-          )
-          Spacer(modifier = Modifier.width(6.dp))
-          Text("Open", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-        }
-
-        // Share Button
-        Surface(
-          onClick = onShare,
-          shape = RoundedCornerShape(10.dp),
-          color = MaterialTheme.colorScheme.surfaceVariant,
-          modifier = Modifier
-            .height(42.dp)
-            .testTag("share_pdf_${pdf.fileName}")
-        ) {
-          Row(
-            modifier = Modifier.padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
+          // Open Button
+          Button(
+            onClick = onOpen,
+            shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.buttonColors(
+              containerColor = if (highContrast) Color.Black else MaterialTheme.colorScheme.primary
+            ),
+            modifier = Modifier
+              .weight(1f)
+              .height(42.dp)
+              .testTag("open_pdf_${pdf.fileName}")
           ) {
             Icon(
-              imageVector = Icons.Default.Share,
-              contentDescription = "Share",
-              tint = MaterialTheme.colorScheme.primary,
+              imageVector = Icons.Default.Visibility,
+              contentDescription = null,
               modifier = Modifier.size(18.dp)
             )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-              text = "Share",
-              style = MaterialTheme.typography.labelMedium,
-              fontWeight = FontWeight.SemiBold,
-              color = MaterialTheme.colorScheme.onSurfaceVariant
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("Open", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+          }
+
+          // Share Button
+          Surface(
+            onClick = onShare,
+            shape = RoundedCornerShape(10.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier
+              .height(42.dp)
+              .testTag("share_pdf_${pdf.fileName}")
+          ) {
+            Row(
+              modifier = Modifier.padding(horizontal = 12.dp),
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              Icon(
+                imageVector = Icons.Default.Share,
+                contentDescription = "Share",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp)
+              )
+              Spacer(modifier = Modifier.width(4.dp))
+              Text(
+                text = "Share",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+              )
+            }
+          }
+
+          // Rename Button
+          IconButton(
+            onClick = onRename,
+            modifier = Modifier
+              .size(42.dp)
+              .testTag("rename_pdf_action_${pdf.fileName}")
+          ) {
+            Icon(
+              imageVector = Icons.Default.DriveFileRenameOutline,
+              contentDescription = "Rename",
+              tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
           }
-        }
 
-        // Rename Button
-        IconButton(
-          onClick = onRename,
-          modifier = Modifier
-            .size(42.dp)
-            .testTag("rename_pdf_action_${pdf.fileName}")
-        ) {
-          Icon(
-            imageVector = Icons.Default.DriveFileRenameOutline,
-            contentDescription = "Rename",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-          )
-        }
-
-        // Delete Button
-        IconButton(
-          onClick = onDelete,
-          modifier = Modifier
-            .size(42.dp)
-            .testTag("delete_pdf_action_${pdf.fileName}")
-        ) {
-          Icon(
-            imageVector = Icons.Default.DeleteOutline,
-            contentDescription = "Delete",
-            tint = MaterialTheme.colorScheme.error
-          )
+          // Delete Button
+          IconButton(
+            onClick = onDelete,
+            modifier = Modifier
+              .size(42.dp)
+              .testTag("delete_pdf_action_${pdf.fileName}")
+          ) {
+            Icon(
+              imageVector = Icons.Default.DeleteOutline,
+              contentDescription = "Delete",
+              tint = MaterialTheme.colorScheme.error
+            )
+          }
         }
       }
     }
   }
 }
+

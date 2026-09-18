@@ -23,7 +23,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.Refresh
@@ -74,13 +73,12 @@ import com.example.util.AppStrings
 fun CropEditorScreen(
   page: ImagePage,
   language: AppLanguage = AppLanguage.ENGLISH,
-  onSave: (rotation: Int, cropRect: CropRect?, cropRatio: Float?, autoTrim: Boolean) -> Unit,
+  onSave: (rotation: Int, cropRect: CropRect?, cropRatio: Float?) -> Unit,
   onCancel: () -> Unit
 ) {
   val context = LocalContext.current
   var currentRotation by remember { mutableIntStateOf(page.rotationDegrees) }
   var currentRatio by remember { mutableStateOf(page.cropAspectRatio) }
-  var autoTrim by remember { mutableStateOf(page.autoTrimApplied) }
 
   // Manual Crop Rect coordinates (normalized 0f to 1f)
   var cropLeft by remember { mutableFloatStateOf(page.cropRect?.left ?: 0f) }
@@ -94,7 +92,6 @@ fun CropEditorScreen(
     cropRight = 1f
     cropBottom = 1f
     currentRatio = null
-    autoTrim = false
   }
 
   Scaffold(
@@ -168,7 +165,7 @@ fun CropEditorScreen(
               } else {
                 null
               }
-              onSave(currentRotation, rect, currentRatio, autoTrim)
+              onSave(currentRotation, rect, currentRatio)
             },
             shape = RoundedCornerShape(14.dp),
             modifier = Modifier
@@ -332,10 +329,10 @@ fun CropEditorScreen(
         modifier = Modifier.fillMaxWidth()
       ) {
         Column(modifier = Modifier.padding(14.dp)) {
-          // Rotate, Auto-Crop, and Reset Row
+          // Rotate and Reset Controls (Clean, spacious, never clipping)
           Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
           ) {
             Button(
               onClick = {
@@ -344,56 +341,37 @@ fun CropEditorScreen(
               shape = RoundedCornerShape(12.dp),
               modifier = Modifier
                 .weight(1f)
-                .height(46.dp)
+                .height(48.dp)
                 .testTag("rotate_button")
             ) {
               Icon(Icons.Default.RotateRight, contentDescription = null, modifier = Modifier.size(20.dp))
-              Spacer(modifier = Modifier.width(4.dp))
-              Text("90°", fontWeight = FontWeight.Bold)
-            }
-
-            Surface(
-              shape = RoundedCornerShape(12.dp),
-              color = if (autoTrim) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-              border = if (autoTrim) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
-              modifier = Modifier
-                .weight(1.3f)
-                .height(46.dp)
-                .clickable { autoTrim = !autoTrim }
-                .testTag("auto_trim_button")
-            ) {
-              Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.padding(horizontal = 8.dp)
-              ) {
-                Icon(
-                  Icons.Default.AutoFixHigh,
-                  contentDescription = null,
-                  modifier = Modifier.size(18.dp),
-                  tint = if (autoTrim) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                  text = if (autoTrim) "Auto-Crop: ON" else "Auto-Crop: OFF",
-                  fontWeight = FontWeight.Bold,
-                  fontSize = 12.sp,
-                  color = if (autoTrim) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-              }
+              Spacer(modifier = Modifier.width(8.dp))
+              Text(
+                text = "Rotate 90°",
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                maxLines = 1,
+                softWrap = false
+              )
             }
 
             OutlinedButton(
               onClick = { resetToFullPhoto() },
               shape = RoundedCornerShape(12.dp),
               modifier = Modifier
-                .weight(1.2f)
-                .height(46.dp)
+                .weight(1f)
+                .height(48.dp)
                 .testTag("reset_crop_button")
             ) {
-              Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-              Spacer(modifier = Modifier.width(4.dp))
-              Text("Reset", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+              Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(20.dp))
+              Spacer(modifier = Modifier.width(8.dp))
+              Text(
+                text = "Reset",
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                maxLines = 1,
+                softWrap = false
+              )
             }
           }
 

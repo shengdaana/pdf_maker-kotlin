@@ -24,8 +24,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
@@ -51,6 +53,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.model.AppTheme
 import com.example.model.DeveloperSettings
 import com.example.model.GeneratedPdf
 import com.example.ui.components.ElderActionButton
@@ -68,9 +71,11 @@ fun HomeScreen(
   onSeeGeneratedPdfs: () -> Unit,
   onOpenSettings: () -> Unit,
   onOpenPdf: (GeneratedPdf) -> Unit,
-  onSharePdf: (GeneratedPdf) -> Unit
+  onSharePdf: (GeneratedPdf) -> Unit,
+  onToggleDarkMode: () -> Unit
 ) {
   val context = LocalContext.current
+  val isDark = settings.theme == AppTheme.DARK || settings.theme == AppTheme.HIGH_CONTRAST_DARK
 
   // Gallery Picker constrained strictly to system photo/image picker (image/*)
   val galleryLauncher = rememberLauncherForActivityResult(
@@ -109,6 +114,18 @@ fun HomeScreen(
           }
         },
         actions = {
+          // Quick Dark/Light Mode toggle button
+          IconButton(
+            onClick = onToggleDarkMode,
+            modifier = Modifier.testTag("home_dark_mode_toggle")
+          ) {
+            Icon(
+              imageVector = if (isDark) Icons.Default.LightMode else Icons.Default.DarkMode,
+              contentDescription = if (isDark) "Switch to Light Mode" else "Switch to Dark Mode",
+              tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+          }
+
           // Discreet small settings gear icon in the top-right corner
           IconButton(
             onClick = onOpenSettings,
