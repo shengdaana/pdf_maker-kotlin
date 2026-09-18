@@ -19,7 +19,6 @@ gallery select photos click share select pdf_maker app and hit generate pdf.
 - Designed with accessibility and ease of use in mind
 - No ads
 - works offline
-## Screenshots
 
 ## Screenshots
 
@@ -56,6 +55,7 @@ gallery select photos click share select pdf_maker app and hit generate pdf.
     <td></td>
   </tr>
 </table>
+
 ## Download
 
 Go to the **Releases** section to download the latest APK.
