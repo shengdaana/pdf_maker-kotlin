@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
@@ -92,43 +93,48 @@ object PdfGenerator {
             downsampled
           }
 
-          val bmpWidth = finalBitmap.width.toFloat()
-          val bmpHeight = finalBitmap.height.toFloat()
+          val bmpWidth = finalBitmap.width
+          val bmpHeight = finalBitmap.height
 
           if (isFreeDynamic) {
-            // MODE 1: FREE / DYNAMIC
+            // MODE 1: FREE / DYNAMIC (ZERO-MARGIN FULL-PAGE BLEED)
             // Page canvas matches exact bitmap dimensions with zero margins
-            val bmpWidth = finalBitmap.width
-            val bmpHeight = finalBitmap.height
-
             val pageInfo = PdfDocument.PageInfo.Builder(bmpWidth, bmpHeight, i + 1).create()
             val pdfPage = pdfDocument.startPage(pageInfo)
             val canvas: Canvas = pdfPage.canvas
 
-            // Direct edge-to-edge drawing at (0f, 0f) with zero white or black margins
-            canvas.drawBitmap(finalBitmap, 0f, 0f, paint)
+            // Reset canvas matrix to ensure no inherited translations or padding offsets
+            canvas.setMatrix(Matrix())
+
+            // Force bitmap to stretch directly across full page bounds with zero white or black margins
+            val destRect = RectF(0f, 0f, pageInfo.pageWidth.toFloat(), pageInfo.pageHeight.toFloat())
+            val drawPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+            canvas.drawBitmap(finalBitmap, null, destRect, drawPaint)
             pdfDocument.finishPage(pdfPage)
           } else {
             // MODE 2: A4 STANDARD
-            // Standard A4 page canvas with centered and scaled photo
             val pageInfo = PdfDocument.PageInfo.Builder(A4_WIDTH_PTS, A4_HEIGHT_PTS, i + 1).create()
             val pdfPage = pdfDocument.startPage(pageInfo)
             val canvas: Canvas = pdfPage.canvas
+
+            // Reset matrix to avoid inherited translations
+            canvas.setMatrix(Matrix())
             canvas.drawColor(Color.WHITE)
 
-            val marginPoints = 16f
+            val marginPoints = 0f // Zero margins for full edge-to-edge fit
             val availableWidth = A4_WIDTH_PTS - (marginPoints * 2)
             val availableHeight = A4_HEIGHT_PTS - (marginPoints * 2)
 
-            val scale = minOf(availableWidth / bmpWidth, availableHeight / bmpHeight)
-            val destWidth = bmpWidth * scale
-            val destHeight = bmpHeight * scale
+            val scale = minOf(availableWidth / bmpWidth.toFloat(), availableHeight / bmpHeight.toFloat())
+            val destWidth = bmpWidth.toFloat() * scale
+            val destHeight = bmpHeight.toFloat() * scale
 
             val destLeft = marginPoints + (availableWidth - destWidth) / 2f
             val destTop = marginPoints + (availableHeight - destHeight) / 2f
             val destRect = RectF(destLeft, destTop, destLeft + destWidth, destTop + destHeight)
 
-            canvas.drawBitmap(finalBitmap, null, destRect, paint)
+            val drawPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+            canvas.drawBitmap(finalBitmap, null, destRect, drawPaint)
             pdfDocument.finishPage(pdfPage)
           }
 

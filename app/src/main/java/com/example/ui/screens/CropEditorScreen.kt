@@ -97,6 +97,9 @@ fun CropEditorScreen(
   var cropRight by remember { mutableFloatStateOf(page.cropRect?.right ?: 1f) }
   var cropBottom by remember { mutableFloatStateOf(page.cropRect?.bottom ?: 1f) }
 
+  // 0: None, 1: TopLeft, 2: TopRight, 3: BottomLeft, 4: BottomRight, 5: Top, 6: Bottom, 7: Left, 8: Right, 9: Move
+  var activeDragMode by remember { mutableIntStateOf(0) }
+
   // Load decoded base bitmap (EXIF-normalized)
   LaunchedEffect(sourceUri) {
     isLoading = true
@@ -287,40 +290,62 @@ fun CropEditorScreen(
             )
 
             // Interactive Drag Gesture & Overlay Canvas
+            val primaryColor = MaterialTheme.colorScheme.primary
             Box(
               modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(Unit) {
-                  var activeDragMode = 0 // 0: None, 1: TopLeft, 2: TopRight, 3: BottomLeft, 4: BottomRight, 5: Top, 6: Bottom, 7: Left, 8: Right, 9: Move
+                .pointerInput(cropLeft, cropTop, cropRight, cropBottom) {
+                  val touchHitRadiusPx = 56.dp.toPx()
+
                   detectDragGestures(
                     onDragStart = { offset ->
-                      val touchX = (offset.x / size.width).coerceIn(0f, 1f)
-                      val touchY = (offset.y / size.height).coerceIn(0f, 1f)
-                      val threshold = 0.08f
+                      val w = size.width.toFloat()
+                      val h = size.height.toFloat()
+                      val pX = offset.x
+                      val pY = offset.y
 
-                      val nearLeft = kotlin.math.abs(touchX - cropLeft) < threshold
-                      val nearRight = kotlin.math.abs(touchX - cropRight) < threshold
-                      val nearTop = kotlin.math.abs(touchY - cropTop) < threshold
-                      val nearBottom = kotlin.math.abs(touchY - cropBottom) < threshold
+                      val cornerTL = Offset(cropLeft * w, cropTop * h)
+                      val cornerTR = Offset(cropRight * w, cropTop * h)
+                      val cornerBL = Offset(cropLeft * w, cropBottom * h)
+                      val cornerBR = Offset(cropRight * w, cropBottom * h)
+
+                      fun distSq(a: Offset, x: Float, y: Float): Float {
+                        val dx = a.x - x
+                        val dy = a.y - y
+                        return dx * dx + dy * dy
+                      }
+                      val hitRadiusSq = touchHitRadiusPx * touchHitRadiusPx
+
+                      val dTL = distSq(cornerTL, pX, pY)
+                      val dTR = distSq(cornerTR, pX, pY)
+                      val dBL = distSq(cornerBL, pX, pY)
+                      val dBR = distSq(cornerBR, pX, pY)
 
                       activeDragMode = when {
-                        nearLeft && nearTop -> 1
-                        nearRight && nearTop -> 2
-                        nearLeft && nearBottom -> 3
-                        nearRight && nearBottom -> 4
-                        nearTop && touchX in cropLeft..cropRight -> 5
-                        nearBottom && touchX in cropLeft..cropRight -> 6
-                        nearLeft && touchY in cropTop..cropBottom -> 7
-                        nearRight && touchY in cropTop..cropBottom -> 8
-                        touchX in cropLeft..cropRight && touchY in cropTop..cropBottom -> 9
+                        dTL <= hitRadiusSq && dTL <= minOf(dTR, dBL, dBR) -> 1
+                        dTR <= hitRadiusSq && dTR <= minOf(dTL, dBL, dBR) -> 2
+                        dBL <= hitRadiusSq && dBL <= minOf(dTL, dTR, dBR) -> 3
+                        dBR <= hitRadiusSq -> 4
+                        // Edge touches
+                        kotlin.math.abs(pY - cornerTL.y) <= touchHitRadiusPx && pX in (cornerTL.x - 20f)..(cornerTR.x + 20f) -> 5
+                        kotlin.math.abs(pY - cornerBL.y) <= touchHitRadiusPx && pX in (cornerBL.x - 20f)..(cornerBR.x + 20f) -> 6
+                        kotlin.math.abs(pX - cornerTL.x) <= touchHitRadiusPx && pY in (cornerTL.y - 20f)..(cornerBL.y + 20f) -> 7
+                        kotlin.math.abs(pX - cornerTR.x) <= touchHitRadiusPx && pY in (cornerTR.y - 20f)..(cornerBR.y + 20f) -> 8
+                        // Inside box -> move
+                        pX in cornerTL.x..cornerTR.x && pY in cornerTL.y..cornerBL.y -> 9
                         else -> 0
                       }
+                    },
+                    onDragEnd = {
+                      activeDragMode = 0
+                    },
+                    onDragCancel = {
+                      activeDragMode = 0
                     },
                     onDrag = { change, dragAmount ->
                       change.consume()
                       val dx = dragAmount.x / size.width.coerceAtLeast(1)
                       val dy = dragAmount.y / size.height.coerceAtLeast(1)
-
                       val minSpan = 0.08f
 
                       when (activeDragMode) {
@@ -378,39 +403,81 @@ fun CropEditorScreen(
                 val rectH = (rectB - rectT).coerceAtLeast(1f)
 
                 // Darkened mask outside crop box
-                drawRect(Color.Black.copy(alpha = 0.55f), Offset(0f, 0f), Size(w, rectT))
-                drawRect(Color.Black.copy(alpha = 0.55f), Offset(0f, rectB), Size(w, h - rectB))
-                drawRect(Color.Black.copy(alpha = 0.55f), Offset(0f, rectT), Size(rectL, rectH))
-                drawRect(Color.Black.copy(alpha = 0.55f), Offset(rectR, rectT), Size(w - rectR, rectH))
+                drawRect(Color.Black.copy(alpha = 0.58f), Offset(0f, 0f), Size(w, rectT))
+                drawRect(Color.Black.copy(alpha = 0.58f), Offset(0f, rectB), Size(w, h - rectB))
+                drawRect(Color.Black.copy(alpha = 0.58f), Offset(0f, rectT), Size(rectL, rectH))
+                drawRect(Color.Black.copy(alpha = 0.58f), Offset(rectR, rectT), Size(w - rectR, rectH))
 
                 // Crop bounding frame
                 drawRect(
                   color = Color.White,
                   topLeft = Offset(rectL, rectT),
                   size = Size(rectW, rectH),
-                  style = Stroke(width = 3.dp.toPx())
+                  style = Stroke(width = 2.5.dp.toPx())
                 )
 
                 // 3x3 Composition grid
                 val thirdW = rectW / 3f
                 val thirdH = rectH / 3f
-                drawLine(Color.White.copy(alpha = 0.4f), Offset(rectL + thirdW, rectT), Offset(rectL + thirdW, rectB), 1.dp.toPx())
-                drawLine(Color.White.copy(alpha = 0.4f), Offset(rectL + thirdW * 2, rectT), Offset(rectL + thirdW * 2, rectB), 1.dp.toPx())
-                drawLine(Color.White.copy(alpha = 0.4f), Offset(rectL, rectT + thirdH), Offset(rectR, rectT + thirdH), 1.dp.toPx())
-                drawLine(Color.White.copy(alpha = 0.4f), Offset(rectL, rectT + thirdH * 2), Offset(rectR, rectT + thirdH * 2), 1.dp.toPx())
+                drawLine(Color.White.copy(alpha = 0.35f), Offset(rectL + thirdW, rectT), Offset(rectL + thirdW, rectB), 1.dp.toPx())
+                drawLine(Color.White.copy(alpha = 0.35f), Offset(rectL + thirdW * 2, rectT), Offset(rectL + thirdW * 2, rectB), 1.dp.toPx())
+                drawLine(Color.White.copy(alpha = 0.35f), Offset(rectL, rectT + thirdH), Offset(rectR, rectT + thirdH), 1.dp.toPx())
+                drawLine(Color.White.copy(alpha = 0.35f), Offset(rectL, rectT + thirdH * 2), Offset(rectR, rectT + thirdH * 2), 1.dp.toPx())
 
-                // Corner handle circles
-                val handleRadius = 7.dp.toPx()
-                drawCircle(Color.White, handleRadius, Offset(rectL, rectT))
-                drawCircle(Color.White, handleRadius, Offset(rectR, rectT))
-                drawCircle(Color.White, handleRadius, Offset(rectL, rectB))
-                drawCircle(Color.White, handleRadius, Offset(rectR, rectB))
+                // High-Contrast Dual-Layer Corner Handles with active touch feedback
+                fun drawEnhancedHandle(center: Offset, isActive: Boolean) {
+                  val baseRadius = 14.dp.toPx()
+                  val activeRadius = 22.dp.toPx()
+                  val currentRadius = if (isActive) activeRadius else baseRadius
 
-                // Edge handle pills
-                drawCircle(Color.White.copy(alpha = 0.85f), 4.dp.toPx(), Offset(rectL + (rectW / 2f), rectT))
-                drawCircle(Color.White.copy(alpha = 0.85f), 4.dp.toPx(), Offset(rectL + (rectW / 2f), rectB))
-                drawCircle(Color.White.copy(alpha = 0.85f), 4.dp.toPx(), Offset(rectL, rectT + (rectH / 2f)))
-                drawCircle(Color.White.copy(alpha = 0.85f), 4.dp.toPx(), Offset(rectR, rectT + (rectH / 2f)))
+                  // Outer glowing halo if actively dragged
+                  if (isActive) {
+                    drawCircle(primaryColor.copy(alpha = 0.35f), currentRadius + 8.dp.toPx(), center)
+                  }
+
+                  // Solid dark outer border
+                  drawCircle(Color(0xFF0F172A), currentRadius + 3.dp.toPx(), center)
+                  // Bright white inner fill
+                  drawCircle(Color.White, currentRadius, center)
+                  // Center primary dot
+                  val innerDotRadius = if (isActive) 7.dp.toPx() else 4.5.dp.toPx()
+                  drawCircle(primaryColor, innerDotRadius, center)
+                }
+
+                // Draw corners (1: TL, 2: TR, 3: BL, 4: BR)
+                drawEnhancedHandle(Offset(rectL, rectT), activeDragMode == 1)
+                drawEnhancedHandle(Offset(rectR, rectT), activeDragMode == 2)
+                drawEnhancedHandle(Offset(rectL, rectB), activeDragMode == 3)
+                drawEnhancedHandle(Offset(rectR, rectB), activeDragMode == 4)
+
+                // High-Contrast Edge Handles (5: Top, 6: Bottom, 7: Left, 8: Right)
+                fun drawEdgePill(center: Offset, isHorizontal: Boolean, isActive: Boolean) {
+                  val pillLength = (if (isActive) 34.dp else 24.dp).toPx()
+                  val pillThickness = (if (isActive) 9.dp else 7.dp).toPx()
+
+                  val pillSize = if (isHorizontal) Size(pillLength, pillThickness) else Size(pillThickness, pillLength)
+                  val pillTopLeft = Offset(center.x - pillSize.width / 2f, center.y - pillSize.height / 2f)
+
+                  // Dark border
+                  drawRoundRect(
+                    color = Color(0xFF0F172A),
+                    topLeft = Offset(pillTopLeft.x - 2.dp.toPx(), pillTopLeft.y - 2.dp.toPx()),
+                    size = Size(pillSize.width + 4.dp.toPx(), pillSize.height + 4.dp.toPx()),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(pillThickness)
+                  )
+                  // White fill
+                  drawRoundRect(
+                    color = if (isActive) primaryColor else Color.White,
+                    topLeft = pillTopLeft,
+                    size = pillSize,
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(pillThickness / 2f)
+                  )
+                }
+
+                drawEdgePill(Offset(rectL + (rectW / 2f), rectT), isHorizontal = true, isActive = activeDragMode == 5)
+                drawEdgePill(Offset(rectL + (rectW / 2f), rectB), isHorizontal = true, isActive = activeDragMode == 6)
+                drawEdgePill(Offset(rectL, rectT + (rectH / 2f)), isHorizontal = false, isActive = activeDragMode == 7)
+                drawEdgePill(Offset(rectR, rectT + (rectH / 2f)), isHorizontal = false, isActive = activeDragMode == 8)
               }
             }
           }
