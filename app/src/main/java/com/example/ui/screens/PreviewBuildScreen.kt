@@ -453,6 +453,8 @@ fun PageCardItem(
           AsyncImage(
             model = ImageRequest.Builder(context)
               .data(page.uri)
+              .memoryCacheKey("${page.id}_${page.customBitmapCacheKey}")
+              .diskCacheKey("${page.id}_${page.customBitmapCacheKey}")
               .crossfade(true)
               .build(),
             contentDescription = "Page ${pageIndex + 1} preview",

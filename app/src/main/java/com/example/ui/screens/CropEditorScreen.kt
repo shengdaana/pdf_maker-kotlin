@@ -1,7 +1,10 @@
 package com.example.ui.screens
 
+import android.graphics.Bitmap
+import android.graphics.Matrix
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -29,6 +32,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -40,6 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -49,10 +54,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -61,12 +66,13 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.example.model.AppLanguage
 import com.example.model.CropRect
 import com.example.model.ImagePage
 import com.example.util.AppStrings
+import com.example.util.ImageUtils
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,14 +83,46 @@ fun CropEditorScreen(
   onCancel: () -> Unit
 ) {
   val context = LocalContext.current
+  val sourceUri = page.originalUri ?: page.uri
+
+  var baseBitmap by remember { mutableStateOf<Bitmap?>(null) }
+  var isLoading by remember { mutableStateOf(true) }
+
   var currentRotation by remember { mutableIntStateOf(page.rotationDegrees) }
   var currentRatio by remember { mutableStateOf(page.cropAspectRatio) }
 
-  // Manual Crop Rect coordinates (normalized 0f to 1f)
+  // Manual Crop Rect coordinates (normalized 0f to 1f relative to rotated image)
   var cropLeft by remember { mutableFloatStateOf(page.cropRect?.left ?: 0f) }
   var cropTop by remember { mutableFloatStateOf(page.cropRect?.top ?: 0f) }
   var cropRight by remember { mutableFloatStateOf(page.cropRect?.right ?: 1f) }
   var cropBottom by remember { mutableFloatStateOf(page.cropRect?.bottom ?: 1f) }
+
+  // Load decoded base bitmap (EXIF-normalized)
+  LaunchedEffect(sourceUri) {
+    isLoading = true
+    withContext(Dispatchers.IO) {
+      val bmp = ImageUtils.decodeSampledBitmapFromUri(context, sourceUri, 2048, 2048)
+      withContext(Dispatchers.Main) {
+        baseBitmap = bmp
+        isLoading = false
+      }
+    }
+  }
+
+  // Active rotated display bitmap
+  val displayBitmap = remember(baseBitmap, currentRotation) {
+    val src = baseBitmap ?: return@remember null
+    if (currentRotation % 360 != 0) {
+      val matrix = Matrix().apply { postRotate(currentRotation.toFloat()) }
+      Bitmap.createBitmap(src, 0, 0, src.width, src.height, matrix, true)
+    } else {
+      src
+    }
+  }
+
+  val bmpWidth = displayBitmap?.width ?: 1
+  val bmpHeight = displayBitmap?.height ?: 1
+  val imageAspect = bmpWidth.toFloat() / bmpHeight.toFloat()
 
   fun resetToFullPhoto() {
     cropLeft = 0f
@@ -92,6 +130,27 @@ fun CropEditorScreen(
     cropRight = 1f
     cropBottom = 1f
     currentRatio = null
+  }
+
+  fun applyPresetRatio(targetAspect: Float) {
+    currentRatio = targetAspect
+    if (imageAspect > targetAspect) {
+      // Photo is wider than target aspect ratio -> fit height, crop width centered
+      val visibleWidthRatio = (targetAspect / imageAspect).coerceIn(0.1f, 1f)
+      val insetX = (1f - visibleWidthRatio) / 2f
+      cropLeft = insetX
+      cropRight = 1f - insetX
+      cropTop = 0f
+      cropBottom = 1f
+    } else {
+      // Photo is taller than target aspect ratio -> fit width, crop height centered
+      val visibleHeightRatio = (imageAspect / targetAspect).coerceIn(0.1f, 1f)
+      val insetY = (1f - visibleHeightRatio) / 2f
+      cropTop = insetY
+      cropBottom = 1f - insetY
+      cropLeft = 0f
+      cropRight = 1f
+    }
   }
 
   Scaffold(
@@ -160,8 +219,13 @@ fun CropEditorScreen(
 
           Button(
             onClick = {
-              val rect = if (cropLeft > 0.01f || cropTop > 0.01f || cropRight < 0.99f || cropBottom < 0.99f) {
-                CropRect(cropLeft, cropTop, cropRight, cropBottom)
+              val rect = if (cropLeft > 0.005f || cropTop > 0.005f || cropRight < 0.995f || cropBottom < 0.995f) {
+                CropRect(
+                  left = cropLeft.coerceIn(0f, 0.95f),
+                  top = cropTop.coerceIn(0f, 0.95f),
+                  right = cropRight.coerceIn(0.05f, 1f),
+                  bottom = cropBottom.coerceIn(0.05f, 1f)
+                )
               } else {
                 null
               }
@@ -193,7 +257,7 @@ fun CropEditorScreen(
         .padding(horizontal = 16.dp),
       horizontalAlignment = Alignment.CenterHorizontally
     ) {
-      // Main interactive preview area with interactive Free Crop handles
+      // Main interactive preview area with WYSIWYG crop canvas
       BoxWithConstraints(
         modifier = Modifier
           .weight(1f)
@@ -203,102 +267,151 @@ fun CropEditorScreen(
           .background(Color(0xFF0F172A)),
         contentAlignment = Alignment.Center
       ) {
-        val containerWidthPx = constraints.maxWidth.toFloat()
-        val containerHeightPx = constraints.maxHeight.toFloat()
-
-        Box(
-          modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-          contentAlignment = Alignment.Center
-        ) {
-          AsyncImage(
-            model = ImageRequest.Builder(context)
-              .data(page.uri)
-              .crossfade(true)
-              .build(),
-            contentDescription = "Editing photo",
-            modifier = Modifier
-              .fillMaxSize()
-              .rotate(currentRotation.toFloat()),
-            contentScale = ContentScale.Fit
-          )
-
-          // Interactive Free Crop Overlay Canvas & Drag Handler
+        if (isLoading || displayBitmap == null) {
+          CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+        } else {
+          // Inner container sized precisely to the aspect ratio of the photo
           Box(
             modifier = Modifier
-              .fillMaxSize()
-              .pointerInput(Unit) {
-                detectDragGestures { change, dragAmount ->
-                  change.consume()
-                  val dx = dragAmount.x / size.width.coerceAtLeast(1)
-                  val dy = dragAmount.y / size.height.coerceAtLeast(1)
-
-                  val touchX = change.position.x / size.width.coerceAtLeast(1)
-                  val touchY = change.position.y / size.height.coerceAtLeast(1)
-
-                  // Determine closest corner/edge to drag
-                  val dLeft = kotlin.math.abs(touchX - cropLeft)
-                  val dRight = kotlin.math.abs(touchX - cropRight)
-                  val dTop = kotlin.math.abs(touchY - cropTop)
-                  val dBottom = kotlin.math.abs(touchY - cropBottom)
-
-                  if (dLeft < dRight && dLeft < 0.25f) {
-                    cropLeft = (cropLeft + dx).coerceIn(0f, cropRight - 0.1f)
-                  } else if (dRight < 0.25f) {
-                    cropRight = (cropRight + dx).coerceIn(cropLeft + 0.1f, 1f)
-                  }
-
-                  if (dTop < dBottom && dTop < 0.25f) {
-                    cropTop = (cropTop + dy).coerceIn(0f, cropBottom - 0.1f)
-                  } else if (dBottom < 0.25f) {
-                    cropBottom = (cropBottom + dy).coerceIn(cropTop + 0.1f, 1f)
-                  }
-                }
-              }
+              .padding(12.dp)
+              .aspectRatio(imageAspect, matchHeightConstraintsFirst = constraints.maxHeight * imageAspect < constraints.maxWidth)
+              .clip(RoundedCornerShape(8.dp)),
+            contentAlignment = Alignment.Center
           ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-              val w = size.width
-              val h = size.height
-              val rectL = cropLeft * w
-              val rectT = cropTop * h
-              val rectR = cropRight * w
-              val rectB = cropBottom * h
-              val rectW = (rectR - rectL).coerceAtLeast(1f)
-              val rectH = (rectB - rectT).coerceAtLeast(1f)
+            // Render rotated bitmap with exact aspect ratio
+            Image(
+              bitmap = displayBitmap.asImageBitmap(),
+              contentDescription = "Editing Photo",
+              modifier = Modifier.fillMaxSize(),
+              contentScale = ContentScale.FillBounds
+            )
 
-              // Darkened dimmed outside mask
-              // Top
-              drawRect(Color.Black.copy(alpha = 0.5f), Offset(0f, 0f), Size(w, rectT))
-              // Bottom
-              drawRect(Color.Black.copy(alpha = 0.5f), Offset(0f, rectB), Size(w, h - rectB))
-              // Left
-              drawRect(Color.Black.copy(alpha = 0.5f), Offset(0f, rectT), Size(rectL, rectH))
-              // Right
-              drawRect(Color.Black.copy(alpha = 0.5f), Offset(rectR, rectT), Size(w - rectR, rectH))
+            // Interactive Drag Gesture & Overlay Canvas
+            Box(
+              modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                  var activeDragMode = 0 // 0: None, 1: TopLeft, 2: TopRight, 3: BottomLeft, 4: BottomRight, 5: Top, 6: Bottom, 7: Left, 8: Right, 9: Move
+                  detectDragGestures(
+                    onDragStart = { offset ->
+                      val touchX = (offset.x / size.width).coerceIn(0f, 1f)
+                      val touchY = (offset.y / size.height).coerceIn(0f, 1f)
+                      val threshold = 0.08f
 
-              // Crop bounding box stroke
-              drawRect(
-                color = Color.White,
-                topLeft = Offset(rectL, rectT),
-                size = Size(rectW, rectH),
-                style = Stroke(width = 3.dp.toPx())
-              )
+                      val nearLeft = kotlin.math.abs(touchX - cropLeft) < threshold
+                      val nearRight = kotlin.math.abs(touchX - cropRight) < threshold
+                      val nearTop = kotlin.math.abs(touchY - cropTop) < threshold
+                      val nearBottom = kotlin.math.abs(touchY - cropBottom) < threshold
 
-              // Grid 3x3 lines
-              val thirdW = rectW / 3f
-              val thirdH = rectH / 3f
-              drawLine(Color.White.copy(alpha = 0.4f), Offset(rectL + thirdW, rectT), Offset(rectL + thirdW, rectB), 1.dp.toPx())
-              drawLine(Color.White.copy(alpha = 0.4f), Offset(rectL + thirdW * 2, rectT), Offset(rectL + thirdW * 2, rectB), 1.dp.toPx())
-              drawLine(Color.White.copy(alpha = 0.4f), Offset(rectL, rectT + thirdH), Offset(rectR, rectT + thirdH), 1.dp.toPx())
-              drawLine(Color.White.copy(alpha = 0.4f), Offset(rectL, rectT + thirdH * 2), Offset(rectR, rectT + thirdH * 2), 1.dp.toPx())
+                      activeDragMode = when {
+                        nearLeft && nearTop -> 1
+                        nearRight && nearTop -> 2
+                        nearLeft && nearBottom -> 3
+                        nearRight && nearBottom -> 4
+                        nearTop && touchX in cropLeft..cropRight -> 5
+                        nearBottom && touchX in cropLeft..cropRight -> 6
+                        nearLeft && touchY in cropTop..cropBottom -> 7
+                        nearRight && touchY in cropTop..cropBottom -> 8
+                        touchX in cropLeft..cropRight && touchY in cropTop..cropBottom -> 9
+                        else -> 0
+                      }
+                    },
+                    onDrag = { change, dragAmount ->
+                      change.consume()
+                      val dx = dragAmount.x / size.width.coerceAtLeast(1)
+                      val dy = dragAmount.y / size.height.coerceAtLeast(1)
 
-              // Corner handles
-              val handleRadius = 6.dp.toPx()
-              drawCircle(Color.White, handleRadius, Offset(rectL, rectT))
-              drawCircle(Color.White, handleRadius, Offset(rectR, rectT))
-              drawCircle(Color.White, handleRadius, Offset(rectL, rectB))
-              drawCircle(Color.White, handleRadius, Offset(rectR, rectB))
+                      val minSpan = 0.08f
+
+                      when (activeDragMode) {
+                        1 -> { // TopLeft
+                          cropLeft = (cropLeft + dx).coerceIn(0f, cropRight - minSpan)
+                          cropTop = (cropTop + dy).coerceIn(0f, cropBottom - minSpan)
+                        }
+                        2 -> { // TopRight
+                          cropRight = (cropRight + dx).coerceIn(cropLeft + minSpan, 1f)
+                          cropTop = (cropTop + dy).coerceIn(0f, cropBottom - minSpan)
+                        }
+                        3 -> { // BottomLeft
+                          cropLeft = (cropLeft + dx).coerceIn(0f, cropRight - minSpan)
+                          cropBottom = (cropBottom + dy).coerceIn(cropTop + minSpan, 1f)
+                        }
+                        4 -> { // BottomRight
+                          cropRight = (cropRight + dx).coerceIn(cropLeft + minSpan, 1f)
+                          cropBottom = (cropBottom + dy).coerceIn(cropTop + minSpan, 1f)
+                        }
+                        5 -> { // Top edge
+                          cropTop = (cropTop + dy).coerceIn(0f, cropBottom - minSpan)
+                        }
+                        6 -> { // Bottom edge
+                          cropBottom = (cropBottom + dy).coerceIn(cropTop + minSpan, 1f)
+                        }
+                        7 -> { // Left edge
+                          cropLeft = (cropLeft + dx).coerceIn(0f, cropRight - minSpan)
+                        }
+                        8 -> { // Right edge
+                          cropRight = (cropRight + dx).coerceIn(cropLeft + minSpan, 1f)
+                        }
+                        9 -> { // Pan / Move entire box
+                          val width = cropRight - cropLeft
+                          val height = cropBottom - cropTop
+                          val newLeft = (cropLeft + dx).coerceIn(0f, 1f - width)
+                          val newTop = (cropTop + dy).coerceIn(0f, 1f - height)
+                          cropLeft = newLeft
+                          cropRight = newLeft + width
+                          cropTop = newTop
+                          cropBottom = newTop + height
+                        }
+                      }
+                    }
+                  )
+                }
+            ) {
+              Canvas(modifier = Modifier.fillMaxSize()) {
+                val w = size.width
+                val h = size.height
+                val rectL = cropLeft * w
+                val rectT = cropTop * h
+                val rectR = cropRight * w
+                val rectB = cropBottom * h
+                val rectW = (rectR - rectL).coerceAtLeast(1f)
+                val rectH = (rectB - rectT).coerceAtLeast(1f)
+
+                // Darkened mask outside crop box
+                drawRect(Color.Black.copy(alpha = 0.55f), Offset(0f, 0f), Size(w, rectT))
+                drawRect(Color.Black.copy(alpha = 0.55f), Offset(0f, rectB), Size(w, h - rectB))
+                drawRect(Color.Black.copy(alpha = 0.55f), Offset(0f, rectT), Size(rectL, rectH))
+                drawRect(Color.Black.copy(alpha = 0.55f), Offset(rectR, rectT), Size(w - rectR, rectH))
+
+                // Crop bounding frame
+                drawRect(
+                  color = Color.White,
+                  topLeft = Offset(rectL, rectT),
+                  size = Size(rectW, rectH),
+                  style = Stroke(width = 3.dp.toPx())
+                )
+
+                // 3x3 Composition grid
+                val thirdW = rectW / 3f
+                val thirdH = rectH / 3f
+                drawLine(Color.White.copy(alpha = 0.4f), Offset(rectL + thirdW, rectT), Offset(rectL + thirdW, rectB), 1.dp.toPx())
+                drawLine(Color.White.copy(alpha = 0.4f), Offset(rectL + thirdW * 2, rectT), Offset(rectL + thirdW * 2, rectB), 1.dp.toPx())
+                drawLine(Color.White.copy(alpha = 0.4f), Offset(rectL, rectT + thirdH), Offset(rectR, rectT + thirdH), 1.dp.toPx())
+                drawLine(Color.White.copy(alpha = 0.4f), Offset(rectL, rectT + thirdH * 2), Offset(rectR, rectT + thirdH * 2), 1.dp.toPx())
+
+                // Corner handle circles
+                val handleRadius = 7.dp.toPx()
+                drawCircle(Color.White, handleRadius, Offset(rectL, rectT))
+                drawCircle(Color.White, handleRadius, Offset(rectR, rectT))
+                drawCircle(Color.White, handleRadius, Offset(rectL, rectB))
+                drawCircle(Color.White, handleRadius, Offset(rectR, rectB))
+
+                // Edge handle pills
+                drawCircle(Color.White.copy(alpha = 0.85f), 4.dp.toPx(), Offset(rectL + (rectW / 2f), rectT))
+                drawCircle(Color.White.copy(alpha = 0.85f), 4.dp.toPx(), Offset(rectL + (rectW / 2f), rectB))
+                drawCircle(Color.White.copy(alpha = 0.85f), 4.dp.toPx(), Offset(rectL, rectT + (rectH / 2f)))
+                drawCircle(Color.White.copy(alpha = 0.85f), 4.dp.toPx(), Offset(rectR, rectT + (rectH / 2f)))
+              }
             }
           }
         }
@@ -306,7 +419,7 @@ fun CropEditorScreen(
         // Floating orientation pill
         Surface(
           shape = RoundedCornerShape(20.dp),
-          color = Color.Black.copy(alpha = 0.7f),
+          color = Color.Black.copy(alpha = 0.75f),
           modifier = Modifier
             .align(Alignment.TopEnd)
             .padding(12.dp)
@@ -329,7 +442,7 @@ fun CropEditorScreen(
         modifier = Modifier.fillMaxWidth()
       ) {
         Column(modifier = Modifier.padding(14.dp)) {
-          // Rotate and Reset Controls (Clean, spacious, never clipping)
+          // Rotate and Reset Controls
           Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -337,6 +450,7 @@ fun CropEditorScreen(
             Button(
               onClick = {
                 currentRotation = (currentRotation + 90) % 360
+                resetToFullPhoto()
               },
               shape = RoundedCornerShape(12.dp),
               modifier = Modifier
@@ -377,7 +491,7 @@ fun CropEditorScreen(
 
           Spacer(modifier = Modifier.height(10.dp))
 
-          // Crop ratio selector chips (Original, A4 Page, 1:1 Square, 4:3)
+          // Clean, distinct aspect ratio preset buttons: Free/Full, A4 Page, 1:1 Square, 4:3 Photo
           Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -385,49 +499,30 @@ fun CropEditorScreen(
             RatioChip(
               label = "Free/Full",
               selected = currentRatio == null,
-              onClick = {
-                currentRatio = null
-                cropLeft = 0f
-                cropTop = 0f
-                cropRight = 1f
-                cropBottom = 1f
-              },
+              onClick = { resetToFullPhoto() },
               modifier = Modifier.weight(1f)
             )
             RatioChip(
               label = "A4 Page",
-              selected = currentRatio == 0.707f,
+              selected = currentRatio == 0.7071f || currentRatio == 1.4142f,
               onClick = {
-                currentRatio = 0.707f
-                // Center A4 ratio inside crop bounds
-                cropLeft = 0.1f
-                cropRight = 0.9f
-                cropTop = 0.05f
-                cropBottom = 0.95f
+                val a4Ratio = if (imageAspect >= 1f) 1.4142f else 0.7071f
+                applyPresetRatio(a4Ratio)
               },
               modifier = Modifier.weight(1f)
             )
             RatioChip(
               label = "1:1 Square",
               selected = currentRatio == 1f,
-              onClick = {
-                currentRatio = 1f
-                cropLeft = 0.15f
-                cropRight = 0.85f
-                cropTop = 0.15f
-                cropBottom = 0.85f
-              },
+              onClick = { applyPresetRatio(1f) },
               modifier = Modifier.weight(1f)
             )
             RatioChip(
               label = "4:3 Photo",
-              selected = currentRatio == 1.333f,
+              selected = currentRatio == 1.3333f || currentRatio == 0.75f,
               onClick = {
-                currentRatio = 1.333f
-                cropLeft = 0.05f
-                cropRight = 0.95f
-                cropTop = 0.15f
-                cropBottom = 0.85f
+                val photoRatio = if (imageAspect >= 1f) (4f / 3f) else (3f / 4f)
+                applyPresetRatio(photoRatio)
               },
               modifier = Modifier.weight(1f)
             )
@@ -451,14 +546,14 @@ private fun RatioChip(
     shape = RoundedCornerShape(10.dp),
     color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
     modifier = modifier
-      .height(36.dp)
+      .height(38.dp)
       .clickable(onClick = onClick)
   ) {
     Box(contentAlignment = Alignment.Center) {
       Text(
         text = label,
         style = MaterialTheme.typography.labelMedium,
-        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
         color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
       )
     }

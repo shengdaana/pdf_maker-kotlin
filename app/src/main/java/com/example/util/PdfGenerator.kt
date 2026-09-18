@@ -97,23 +97,16 @@ object PdfGenerator {
 
           if (isFreeDynamic) {
             // MODE 1: FREE / DYNAMIC
-            // Page canvas matches the photo's native aspect ratio with zero margins
-            val basePt = 595f
-            val (pageW, pageH) = if (bmpWidth >= bmpHeight) {
-              val w = (basePt * (bmpWidth / bmpHeight)).toInt().coerceAtLeast(100)
-              w to basePt.toInt()
-            } else {
-              val h = (basePt * (bmpHeight / bmpWidth)).toInt().coerceAtLeast(100)
-              basePt.toInt() to h
-            }
+            // Page canvas matches exact bitmap dimensions with zero margins
+            val bmpWidth = finalBitmap.width
+            val bmpHeight = finalBitmap.height
 
-            val pageInfo = PdfDocument.PageInfo.Builder(pageW, pageH, i + 1).create()
+            val pageInfo = PdfDocument.PageInfo.Builder(bmpWidth, bmpHeight, i + 1).create()
             val pdfPage = pdfDocument.startPage(pageInfo)
             val canvas: Canvas = pdfPage.canvas
 
-            // Direct edge-to-edge drawing with no white margins
-            val destRect = RectF(0f, 0f, pageW.toFloat(), pageH.toFloat())
-            canvas.drawBitmap(finalBitmap, null, destRect, paint)
+            // Direct edge-to-edge drawing at (0f, 0f) with zero white or black margins
+            canvas.drawBitmap(finalBitmap, 0f, 0f, paint)
             pdfDocument.finishPage(pdfPage)
           } else {
             // MODE 2: A4 STANDARD
@@ -123,7 +116,7 @@ object PdfGenerator {
             val canvas: Canvas = pdfPage.canvas
             canvas.drawColor(Color.WHITE)
 
-            val marginPoints = 20f
+            val marginPoints = 16f
             val availableWidth = A4_WIDTH_PTS - (marginPoints * 2)
             val availableHeight = A4_HEIGHT_PTS - (marginPoints * 2)
 

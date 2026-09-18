@@ -220,13 +220,68 @@ object ImageUtils {
     reqWidth: Int = 1600,
     reqHeight: Int = 2200
   ): Bitmap? {
-    val decoded = decodeSampledBitmapFromUri(context, page.uri, reqWidth, reqHeight) ?: return null
-    return processBitmap(
-      source = decoded,
+    val sourceUri = page.originalUri ?: page.uri
+    return getProcessedPageBitmapFromUri(
+      context = context,
+      uri = sourceUri,
       rotationDegrees = page.rotationDegrees,
       cropRect = page.cropRect,
-      targetAspectRatio = page.cropAspectRatio
+      cropAspectRatio = page.cropAspectRatio,
+      reqWidth = reqWidth,
+      reqHeight = reqHeight
     )
+  }
+
+  fun getProcessedPageBitmapFromUri(
+    context: Context,
+    uri: Uri,
+    rotationDegrees: Int,
+    cropRect: CropRect?,
+    cropAspectRatio: Float?,
+    reqWidth: Int = 2400,
+    reqHeight: Int = 2400
+  ): Bitmap? {
+    val decoded = decodeSampledBitmapFromUri(context, uri, reqWidth, reqHeight) ?: return null
+    return processBitmap(
+      source = decoded,
+      rotationDegrees = rotationDegrees,
+      cropRect = cropRect,
+      targetAspectRatio = cropAspectRatio
+    )
+  }
+
+  /**
+   * Saves cropped and rotated bitmap to a cache file so the preview list updates immediately.
+   */
+  suspend fun saveCroppedImage(
+    context: Context,
+    pageId: String,
+    uri: Uri,
+    rotationDegrees: Int,
+    cropRect: CropRect?,
+    cropAspectRatio: Float?
+  ): File? = withContext(Dispatchers.IO) {
+    try {
+      val processed = getProcessedPageBitmapFromUri(
+        context = context,
+        uri = uri,
+        rotationDegrees = rotationDegrees,
+        cropRect = cropRect,
+        cropAspectRatio = cropAspectRatio,
+        reqWidth = 3500,
+        reqHeight = 3500
+      ) ?: return@withContext null
+
+      val dir = File(context.cacheDir, "page_crops").apply { mkdirs() }
+      val file = File(dir, "crop_${pageId}_${System.currentTimeMillis()}.jpg")
+      FileOutputStream(file).use { out ->
+        processed.compress(Bitmap.CompressFormat.JPEG, 95, out)
+      }
+      processed.recycle()
+      file
+    } catch (_: Exception) {
+      null
+    }
   }
 
   /**

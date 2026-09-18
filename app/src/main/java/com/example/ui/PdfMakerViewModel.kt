@@ -123,19 +123,44 @@ class PdfMakerViewModel(application: Application) : AndroidViewModel(application
     cropRect: CropRect?,
     cropAspectRatio: Float?
   ) {
-    val list = _pages.value.map { page ->
-      if (page.id == pageId) {
-        page.copy(
-          rotationDegrees = rotationDegrees,
-          cropRect = cropRect,
-          cropAspectRatio = cropAspectRatio,
-          customBitmapCacheKey = System.currentTimeMillis()
-        )
-      } else {
-        page
+    viewModelScope.launch {
+      val currentPage = _pages.value.find { it.id == pageId } ?: return@launch
+      val baseUri = currentPage.originalUri ?: currentPage.uri
+      val croppedFile = ImageUtils.saveCroppedImage(
+        context = getApplication(),
+        pageId = pageId,
+        uri = baseUri,
+        rotationDegrees = rotationDegrees,
+        cropRect = cropRect,
+        cropAspectRatio = cropAspectRatio
+      )
+
+      val newCacheKey = System.currentTimeMillis()
+      val list = _pages.value.map { page ->
+        if (page.id == pageId) {
+          if (croppedFile != null) {
+            page.copy(
+              uri = Uri.fromFile(croppedFile),
+              originalUri = baseUri,
+              rotationDegrees = 0,
+              cropRect = null,
+              cropAspectRatio = null,
+              customBitmapCacheKey = newCacheKey
+            )
+          } else {
+            page.copy(
+              rotationDegrees = rotationDegrees,
+              cropRect = cropRect,
+              cropAspectRatio = cropAspectRatio,
+              customBitmapCacheKey = newCacheKey
+            )
+          }
+        } else {
+          page
+        }
       }
+      _pages.value = list
     }
-    _pages.value = list
   }
 
   fun mergePages(firstIndex: Int) {

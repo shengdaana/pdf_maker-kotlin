@@ -23,6 +23,7 @@ data class CropRect(
 data class ImagePage(
   val id: String = java.util.UUID.randomUUID().toString(),
   val uri: Uri,
+  val originalUri: Uri? = null,
   val rotationDegrees: Int = 0, // 0, 90, 180, 270
   val cropRect: CropRect? = null, // manual free crop area
   val cropAspectRatio: Float? = null, // null for original, or width/height ratio like 1f (square), 0.707f (A4 portrait)
